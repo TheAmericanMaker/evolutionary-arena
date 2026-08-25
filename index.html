@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Evolutionary Arena</title>
+  <link rel="icon" href="data:," />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -54,5 +55,24 @@
   </main>
   <div id="inspect" hidden></div>
   <script type="module" src="src/engine.js"></script>
+  <script>
+    // Boot watchdog (classic script, so it runs even when the module graph
+    // does not): if engine.js has not flagged a successful boot shortly
+    // after load — e.g. the page was opened directly via file://, where
+    // browsers block ES module scripts — replace the dead splash with
+    // instructions instead of leaving an unresponsive screen.
+    setTimeout(function () {
+      if (window.__arenaBooted) return;
+      var s = document.querySelector('#splash div');
+      if (!s) return;
+      s.innerHTML =
+        '<h1>Evolutionary Arena</h1>' +
+        '<p>Could not start: this page uses ES modules, which browsers ' +
+        'block when the file is opened directly (file://).</p>' +
+        '<p>Serve the folder instead, then open the local URL:</p>' +
+        '<pre>python3 -m http.server 8000</pre>' +
+        '<p>then visit <a href="http://localhost:8000/">http://localhost:8000/</a></p>';
+    }, 1000);
+  </script>
 </body>
 </html>

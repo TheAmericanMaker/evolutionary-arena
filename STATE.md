@@ -132,4 +132,10 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
 - Ambiguities: decide, then write the decision as a comment at the top of
   the file you change.
 - Human serves the folder (python3 -m http.server) and reviews in browser;
-  we verify via tests only.
+  we verify via tests only. **Must be served over http — do NOT open
+  index.html via file://**: browsers block ES module scripts there, the
+  engine never boots, and the page shows a dead splash. index.html carries
+  a classic-script boot watchdog (engine.js sets window.__arenaBooted)
+  that replaces the splash with serve instructions if boot fails within
+  1s. Verified in headless Chromium (http: boots, resume/space work, zero
+  console errors incl. favicon; file://: watchdog instructions shown).

@@ -20,7 +20,8 @@ function frame() {
   }
   render(ctx, app.world);
   ui.hud();
-  requestAnimationFrame(frame);
+window.__arenaBooted = true;
+requestAnimationFrame(frame);
 }
 
 requestAnimationFrame(frame);

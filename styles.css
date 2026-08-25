@@ -68,6 +68,16 @@ main {
 #splash[hidden] { display: none; }
 #splash h1 { margin: 0 0 8px; font-size: 28px; color: #e2e8f0; }
 #splash p { margin: 0; color: #94a3b8; }
+#splash pre {
+  display: inline-block;
+  margin: 12px 0;
+  padding: 8px 14px;
+  background: #111827;
+  border: 1px solid #1e293b;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-family: inherit;
+}
 
 #inspect {
   position: fixed;
