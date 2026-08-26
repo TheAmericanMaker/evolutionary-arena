@@ -11,7 +11,10 @@ so a fresh session can resume without re-reading everything.
 - M4 predation & flee: DONE
 - M5 controls & UX: DONE
 - M6 polish: DONE (chart, best-lineage card, tuning pass, acceptance)
-- All milestones complete; awaiting final human browser review.
+- M7 post-spec polish: DONE (spawn marker rings, shift-click ×5 spawn,
+  tracked inspect line, splash controls legend, file:// watchdog)
+- All spec milestones complete; M7 was user-feedback polish after browser
+  review.
 
 Milestone rule: one milestone per turn, then STOP for human browser review.
 Do not auto-advance. End every turn with a 1–2 sentence done summary plus
@@ -80,6 +83,18 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
   `BEST <lineage> · fit <value>` plus the DNA snapshot (spd/vis/met/
   agg/size). Survives world reset (card keeps the carried-over all-time
   record; sparkline redraws from an empty window).
+- M7 decisions (user feedback): spawn buttons put creatures at RANDOM spots,
+  which looked dead → every spawn pushes a marker {x, y, t, hue} to
+  app.fx; engine prunes after render.js SPAWN_FX_TICKS=90, render draws an
+  expanding fading ring (4→30px, hue = 130 - aggression*130, same formula
+  as drawCreature). Shift-click on +buttons spawns 5 (same convention as
+  canvas scatter); tooltips on the buttons, legend line on the splash.
+  Inspect line now FOLLOWS the creature (ui.js keeps an `inspected` ref,
+  hud() calls refreshInspect() each frame: live E/fit, repositioned over the
+  creature, auto-hides on death, cleared by any other canvas action or
+  reset). window.__arena = app is a console/debug handle (browser smoke
+  tests use it). Verified in headless Chromium: ring pixels confirmed by
+  radial getImageData scan (pause freezes the ring at its radius).
 - M6 tuning decision: DEFAULT_PLANT_RATE 0.05 → 0.3 (index.html slider now
   0..0.5, default 0.30). Grid probe (plantRate × mutation, 3000–5000 tick
   runs, 5 seeds) showed plant inflow is the dominant boom/crash lever

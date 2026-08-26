@@ -6,10 +6,14 @@
 // - Sliders feed world.settings every frame via hud() (was engine's job).
 // - Spawn buttons: standardized genomes (dna.js) at random toroidal spots
 //   via world.rng, energy OFFSPRING_ENERGY, fresh lineages U1, U2, ...
+//   Shift-click spawns 5 (same convention as canvas scatter). Every spawn
+//   drops a marker ring (app.fx) because the spot is random.
 // - Canvas click, by tool: Plant (default) — a creature under the cursor
-//   (<= max(6, size+3) px) is INSPECTED (DNA line at the cursor), otherwise
-//   a plant is dropped (drag paints, one per ~8px travel; user plants cost
-//   no pool energy and bypass MAX_PLANTS: user input overrides the economy).
+//   (<= max(6, size+3) px) is INSPECTED; the DNA line FOLLOWS that creature
+//   each frame (live E/fit), auto-hides when it dies, and any other canvas
+//   action clears it. Otherwise a plant is dropped (drag paints, one per
+//   ~8px travel; user plants cost no pool energy and bypass MAX_PLANTS:
+//   user input overrides the economy).
 //   Feed — the tool wins over inspect: every click/drag gives +FEED_ENERGY
 //   to creatures within FEED_RADIUS (spec §1: "feed creatures by clicking
 //   them"). Shift-click always scatters (plant: 5 in a 48px disc; feed:
@@ -73,7 +77,7 @@ export function createUI(app) {
   }
 
   els.pauseBtn.addEventListener('click', () => setPaused(!app.paused));
-  els.stepBtn.addEventListener('click', () => { tick(app.world); els.inspect.hidden = true; });
+  els.stepBtn.addEventListener('click', () => tick(app.world));
   window.addEventListener('keydown', (e) => {
     if (e.code !== 'Space' || e.target !== document.body) return;
     e.preventDefault();
@@ -95,13 +99,20 @@ export function createUI(app) {
     killArmed = !killArmed;
     els.killBtn.classList.toggle('armed', killArmed);
   });
-  els.herbBtn.addEventListener('click', () => { userSeq += 1; spawn(app.world, HERBIVORE_DNA, `U${userSeq}`); });
-  els.carnBtn.addEventListener('click', () => { userSeq += 1; spawn(app.world, CARNIVORE_DNA, `U${userSeq}`); });
+  function spawnMany(dna, n) {
+    for (let i = 0; i < n; i++) {
+      userSeq += 1;
+      const c = spawn(app.world, dna, `U${userSeq}`);
+      app.fx.push({ x: c.x, y: c.y, t: app.world.tick, hue: 130 - dna.aggression * 130 });
+    }
+  }
+  els.herbBtn.addEventListener('click', (e) => spawnMany(HERBIVORE_DNA, e.shiftKey ? 5 : 1));
+  els.carnBtn.addEventListener('click', (e) => spawnMany(CARNIVORE_DNA, e.shiftKey ? 5 : 1));
   els.resetBtn.addEventListener('click', () => {
     const kept = app.world.records.data;
     app.world = createWorld(1);
     app.world.records.load(kept);
-    els.inspect.hidden = true;
+    clearInspect();
   });
   els.recordsBtn.addEventListener('click', () => {
     app.world.records.reset();
@@ -153,38 +164,53 @@ export function createUI(app) {
     }
   }
 
-  function showInspect(c, e) {
+  let inspected = null;
+  function clearInspect() {
+    inspected = null;
+    els.inspect.hidden = true;
+  }
+  // Follows the inspected creature each frame (hud calls it), so the line
+  // sticks to its subject instead of stranding at the old cursor spot.
+  function refreshInspect() {
+    if (!inspected) return;
+    if (!app.world.creatures.includes(inspected)) { clearInspect(); return; }
+    const c = inspected;
     const d = c.dna;
     els.inspect.textContent =
       `${c.lineageId} g${c.generation} · ${c.state} · E ${c.energy.toFixed(0)} · fit ${fitness(c).toFixed(0)}\n` +
       `spd ${d.speed.toFixed(2)} · vis ${d.vision.toFixed(0)} · met ${d.metabolism.toFixed(3)}\n` +
       `agg ${d.aggression.toFixed(2)} · size ${d.size.toFixed(1)}`;
-    els.inspect.style.left = `${Math.min(e.clientX + 12, window.innerWidth - 280)}px`;
-    els.inspect.style.top = `${e.clientY + 18}px`;
+    const r = els.canvas.getBoundingClientRect();
+    const sx = r.left + (c.x / W) * r.width;
+    const sy = r.top + (c.y / H) * r.height;
+    els.inspect.style.left = `${Math.min(sx + 14, window.innerWidth - 260)}px`;
+    els.inspect.style.top = `${Math.min(sy + 18, window.innerHeight - 96)}px`;
     els.inspect.hidden = false;
   }
 
   els.canvas.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
     const { x, y } = worldPos(e);
-    if (e.shiftKey) { scatter(x, y); return; }
+    if (e.shiftKey) { clearInspect(); scatter(x, y); return; }
     if (killArmed) {
       killArmed = false;
       els.killBtn.classList.remove('armed');
       const victim = creatureAt(x, y, KILL_RADIUS);
       if (victim) {
         app.world.creatures = app.world.creatures.filter((c) => c !== victim);
-        els.inspect.hidden = true;
+        clearInspect();
       }
       return;
     }
     if (tool === 'feed') {
+      clearInspect();
       painting = { x, y };
       brush(x, y);
       return;
     }
     const hit = creatureAt(x, y, 6);
-    if (hit) { showInspect(hit, e); return; }
+    if (hit) { inspected = hit; refreshInspect(); return; }
+    clearInspect();
     painting = { x, y };
     brush(x, y);
   });
@@ -229,6 +255,7 @@ export function createUI(app) {
     els.speedVal.textContent = String(speed());
     els.plantRateVal.textContent = Number(els.plantRate.value).toFixed(2);
     els.mutationVal.textContent = Number(els.mutation.value).toFixed(2);
+    refreshInspect();
   }
 
   return { speed, hud, setPaused };

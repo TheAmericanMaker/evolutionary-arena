@@ -3,7 +3,11 @@
 import { W, H } from './world.js';
 import { plantRadius, MAX_ENERGY } from './entity.js';
 
-export function render(ctx, world) {
+// Lifetime of a spawn marker ring, in ticks (~1.5s at 1x). Exported so the
+// engine can prune app.fx with the same horizon the renderer fades over.
+export const SPAWN_FX_TICKS = 90;
+
+export function render(ctx, world, fx = []) {
   ctx.fillStyle = '#0b0e14';
   ctx.fillRect(0, 0, W, H);
   drawGrid(ctx);
@@ -14,6 +18,23 @@ export function render(ctx, world) {
     ctx.fill();
   }
   for (const c of world.creatures) drawCreature(ctx, c);
+  drawSpawnFx(ctx, fx, world.tick);
+}
+
+// M7: expanding fading ring where the user spawned a creature (spawn goes to
+// a random toroidal spot, so without a marker the button looks dead).
+function drawSpawnFx(ctx, fx, tick) {
+  for (const f of fx) {
+    const t = Math.min(1, (tick - f.t) / SPAWN_FX_TICKS);
+    if (t < 0) continue;
+    ctx.globalAlpha = 0.9 * (1 - t);
+    ctx.strokeStyle = `hsl(${f.hue}, 80%, 60%)`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 4 + t * 26, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawCreature(ctx, c) {

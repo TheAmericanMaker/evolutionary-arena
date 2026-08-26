@@ -4,13 +4,15 @@
 // "paused — press space"); space or Resume starts it.
 
 import { createWorld, tick } from './world.js';
-import { render } from './render.js';
+import { render, SPAWN_FX_TICKS } from './render.js';
 import { createUI } from './ui.js';
 
 const canvas = document.getElementById('world');
 const ctx = canvas.getContext('2d');
 
-export const app = { world: createWorld(1), paused: true };
+// app.fx: transient spawn markers {x, y, t, hue}; ui.js pushes, engine prunes.
+export const app = { world: createWorld(1), paused: true, fx: [] };
+window.__arena = app; // console/debug handle (browser smoke tests use it)
 const ui = createUI(app);
 
 function frame() {
@@ -18,10 +20,12 @@ function frame() {
     const n = ui.speed();
     for (let i = 0; i < n; i++) tick(app.world);
   }
-  render(ctx, app.world);
+  const t = app.world.tick;
+  if (app.fx.length) app.fx = app.fx.filter((f) => t - f.t < SPAWN_FX_TICKS);
+  render(ctx, app.world, app.fx);
   ui.hud();
-window.__arenaBooted = true;
-requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }
 
+window.__arenaBooted = true;
 requestAnimationFrame(frame);
