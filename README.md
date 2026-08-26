@@ -1,0 +1,71 @@
+# Evolutionary Arena
+
+A living ecosystem in a 2D wrap-around world, running in your browser.
+Zero dependencies, no build step — plain ES modules on one canvas.
+
+Creatures with five-trait DNA swim around, eat, flee, hunt, and bud.
+Offspring inherit mutated copies of their genome, so populations drift
+over time: faster hunters, sharper eyes, leaner metabolisms. Predator–prey
+cycles, boom/crash swings, and speciation all emerge — nothing is scripted.
+
+## Run
+
+The app must be served over HTTP (browsers block ES modules on `file://`):
+
+    python3 -m http.server 8000
+
+then open <http://localhost:8000/>. It works fully offline in any modern browser.
+
+## Controls
+
+| Action | Effect |
+| --- | --- |
+| Click | Inspect a creature (live DNA + energy), or drop a plant on empty ground |
+| Shift + click | Spawn ×5 (buttons) · splat 5 tiles (terrain mode) |
+| +Herbivore / +Carnivore | Spawn a standardized creature at a random spot |
+| Terrain + swatch | Pick a biome, drag to paint: water, rock, forest, tundra, scorched, open |
+| Impact + severity | Arm, then click: hazard drop. 3+ scars the terrain; 4 leaves a radiation cloud |
+| Kill under cursor | Arm, then click a creature to remove it |
+| Space / Pause | Pause-resume (Step ticks one while paused) |
+| Mouse wheel | Simulation speed (1–64×) |
+
+## How it works
+
+- **DNA** — five bounded traits: speed, vision, metabolism, aggression, size.
+  Offspring are gaussian-mutated clones (sigma = 0.4 × trait range × mutation
+  rate, scaled by the slider), clamped to range. Aggression ≥ 0.55 and
+  size + 1 > prey size makes you a predator; everyone else flees anything
+  meaner than themselves.
+- **Energy** — plants grow from a global regenerating pool; creatures eat
+  plants on contact or bite prey (a fixed 30-energy chunk per bite, so
+  predation can actually kill). Metabolism drains every tick; at 120 energy
+  a creature buds (parent −40, offspring +40); at 0 it dies.
+- **Terrain** — 32×20 biome tiles generated from the seed: water and rock
+  are impassable, forest doubles plant growth, tundra halves it and costs
+  25% more metabolism. Big impacts scar the ground: severity 3 scorches a
+  crater, severity 4 turns the core to rock, scorches the rim, and leaves a
+  900-tick radiation cloud that multiplies offspring mutation up to 10×.
+- **Determinism** — every random number flows through one seeded xorshift32
+  PRNG at a fixed timestep. Same seed, same history — that's what the test
+  suite leans on.
+- **Stats** — live HUD (population by diet, average energy, lineages), a
+  200-tick population sparkline, and all-time records (best fitness, longest
+  lineage, peak population) persisted to localStorage across sessions.
+
+## Development
+
+Node 22, no packages. `package.json` exists only to set `"type": "module"`.
+
+Pure simulation logic (`rng`, `dna`, `spatial`, `entity`, `world`, `stats`,
+`terrain`, `effects`, `panel`) is unit tested; canvas rendering and DOM
+wiring are deliberately thin and untested.
+
+    node --test "tests/*.test.js"   # 63 tests
+
+Layout: `src/` holds the simulation plus render and UI, with `engine.js` as
+the single bootstrap; `tests/` is the node:test suite; `PROMPT.md` is the
+original design spec; `STATE.md` carries the milestone handoff notes.
+
+## License
+
+[MIT](LICENSE) © James Sesler
