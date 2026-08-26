@@ -4,7 +4,7 @@ Backlog, in priority order. Each item lands as one small PR that is
 reviewed before merging into `main`.
 
 ## Wave 1 — finish what's planned, harden the core claims
-- [ ] M10 Tornado + Boons — drag-drawn tornado hazard; Feast and Perk boon zones
+- [x] M10 Tornado + Boons — drag-drawn tornado hazard; Feast and Perk boon zones
 - [ ] CI: GitHub Actions running `node --test` on push
 - [ ] Determinism regression test (same seed, two worlds, identical state after N ticks)
 - [ ] Seed display + copy in the HUD (shareable, replayable runs)

@@ -11,10 +11,10 @@
 import { createRng } from './rng.js';
 import { randomDna } from './dna.js';
 import { createSpatial } from './spatial.js';
-import { createCreature, updateCreature, OFFSPRING_ENERGY } from './entity.js';
+import { createCreature, updateCreature, OFFSPRING_ENERGY, MAX_ENERGY } from './entity.js';
 import { createStats, createRecords } from './stats.js';
 import { createTerrain } from './terrain.js';
-import { createEffects } from './effects.js';
+import { createEffects, tickTornado } from './effects.js';
 
 export const W = 1024;
 export const H = 640;
@@ -72,6 +72,8 @@ export function createWorld(seed = 1) {
   world.effects = createEffects();
   world.deaths = { starve: 0, predation: 0, hazard: 0, user: 0 };
   world.births = 0;
+  // M10: active tornado path state (effects.js); null when no tornado is live.
+  world.tornado = null;
   for (let i = 0; i < INITIAL_CREATURES; i++) {
     const spot = freeSpot(world);
     world.creatures.push(createCreature({
@@ -124,7 +126,13 @@ export function tick(world) {
       c.energy = Math.max(0, c.energy - drain);
       if (c.energy <= 0) { c.dead = true; c.deathCause = 'hazard'; }
     }
+    // M10: feast zones are the only positive zone — energy gain, capped.
+    const gain = world.effects.gainAt(c.x, c.y);
+    if (gain > 0 && !c.dead) c.energy = Math.min(MAX_ENERGY, c.energy + gain);
   }
+  // M10: the tornado corridor clears plants and damages creatures; deaths
+  // are tallied in the loop below, same tick.
+  tickTornado(world);
   world.effects.tick();
   for (const c of world.creatures) {
     if (c.dead) world.deaths[c.deathCause || 'starve'] += 1;

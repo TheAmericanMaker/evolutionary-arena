@@ -3,19 +3,20 @@
 import { W, H } from './world.js';
 import { plantRadius, MAX_ENERGY } from './entity.js';
 import { BIOMES, TILE } from './terrain.js';
+import { TORNADO_RADIUS } from './effects.js';
 
 // Lifetime of a spawn marker ring, in ticks (~1.5s at 1x). Exported so the
 // engine can prune app.fx with the same horizon the renderer fades over.
 export const SPAWN_FX_TICKS = 90;
 
 // M9: `shake` (px, decaying in engine.js) jitters the whole frame.
-export function render(ctx, world, fx = [], shake = 0) {
+// M10: `draft` — the tornado path being dragged on the canvas (null otherwise).
+export function render(ctx, world, fx = [], shake = 0, draft = null) {
   if (shake >= 0.5) ctx.save();
   if (shake >= 0.5) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
   ctx.fillStyle = '#0b0e14';
   ctx.fillRect(-8, -8, W + 16, H + 16);
   ctx.drawImage(terrainLayer(world), 0, 0);
-  drawGrid(ctx);
   drawZones(ctx, world);
   ctx.fillStyle = '#4ade80';
   for (const p of world.plants) {
@@ -24,7 +25,9 @@ export function render(ctx, world, fx = [], shake = 0) {
     ctx.fill();
   }
   for (const c of world.creatures) drawCreature(ctx, c);
+  drawTornado(ctx, world);
   drawSpawnFx(ctx, fx, world.tick);
+  if (draft) drawTornadoDraft(ctx, draft);
   if (shake >= 0.5) ctx.restore();
 }
 
@@ -35,6 +38,8 @@ function drawZones(ctx, world) {
     let fill;
     if (z.kind === 'scorch') fill = `rgba(248, 113, 113, ${0.05 + 0.04 * z.power * (0.5 + 0.5 * fade)})`;
     else if (z.kind === 'rad') fill = `rgba(74, 222, 128, ${0.06 + 0.05 * fade})`;
+    else if (z.kind === 'feast') fill = `rgba(251, 191, 36, ${0.05 + 0.05 * fade})`;
+    else if (z.kind === 'fert') fill = `rgba(244, 114, 182, ${0.05 + 0.05 * fade})`;
     else continue;
     ctx.fillStyle = fill;
     ctx.beginPath();
@@ -44,6 +49,42 @@ function drawZones(ctx, world) {
     ctx.lineWidth = 1;
     ctx.stroke();
   }
+}
+
+// M10: the tornado head — three spinning arcs in the corridor, plus the
+// corridor ring so the hazard radius reads at a glance.
+function drawTornado(ctx, world) {
+  const t = world.tornado;
+  if (!t) return;
+  const rot = world.tick * 0.35;
+  ctx.strokeStyle = 'rgba(203, 213, 225, 0.7)';
+  for (let i = 0; i < 3; i++) {
+    ctx.lineWidth = 2.5 - i * 0.6;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 7 + i * 6, rot + i, rot + i + Math.PI * 1.4);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(t.x, t.y, TORNADO_RADIUS, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+// M10: the dashed path the user is dragging before release.
+function drawTornadoDraft(ctx, draft) {
+  if (draft.length < 2) return;
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath();
+  ctx.moveTo(draft[0].x, draft[0].y);
+  for (let i = 1; i < draft.length; i++) ctx.lineTo(draft[i].x, draft[i].y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(draft[draft.length - 1].x, draft[draft.length - 1].y, 4, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 // M8: the biome layer, baked once to an offscreen canvas and re-baked only

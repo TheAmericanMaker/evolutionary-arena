@@ -13,8 +13,9 @@ const ctx = canvas.getContext('2d');
 // app.fx: transient spawn markers {x, y, t, hue} (M9: + optional `ring`
 // max radius for impact blasts); ui.js pushes, engine prunes.
 // app.shake: M9 screen-shake amplitude in px; ui.js sets it on impact, the
-// frame loop decays it.
-export const app = { world: createWorld(1), paused: true, fx: [], shake: 0 };
+// frame loop decays it. M10: while a tornado is live the frame loop holds a
+// low shake floor; app.tornadoDraft is the in-progress tornado drag (ui.js).
+export const app = { world: createWorld(1), paused: true, fx: [], shake: 0, tornadoDraft: null };
 window.__arena = app; // console/debug handle (browser smoke tests use it)
 const ui = createUI(app);
 
@@ -25,7 +26,8 @@ function frame() {
   }
   const t = app.world.tick;
   if (app.fx.length) app.fx = app.fx.filter((f) => t - f.t < SPAWN_FX_TICKS);
-  render(ctx, app.world, app.fx, app.shake);
+  if (app.world.tornado) app.shake = Math.max(app.shake, 2);
+  render(ctx, app.world, app.fx, app.shake, app.tornadoDraft);
   if (app.shake) app.shake = app.shake > 0.5 ? app.shake * 0.85 : 0;
   ui.hud();
   requestAnimationFrame(frame);
