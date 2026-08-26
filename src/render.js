@@ -3,7 +3,7 @@
 import { W, H } from './world.js';
 import { plantRadius, MAX_ENERGY } from './entity.js';
 import { BIOMES, TILE } from './terrain.js';
-import { TORNADO_RADIUS } from './effects.js';
+import { TORNADO_RADIUS, tornadoPoint } from './effects.js';
 
 // Lifetime of a spawn marker ring, in ticks (~1.5s at 1x). Exported so the
 // engine can prune app.fx with the same horizon the renderer fades over.
@@ -52,11 +52,22 @@ function drawZones(ctx, world) {
 }
 
 // M10: the tornado head — three spinning arcs in the corridor, plus the
-// corridor ring so the hazard radius reads at a glance.
+// corridor ring so the hazard radius reads at a glance — and a fading wake
+// behind the head so a fast sweep is visible (user review: the bare head
+// was too small/quick to notice at 6 px/tick).
 function drawTornado(ctx, world) {
   const t = world.tornado;
   if (!t) return;
   const rot = world.tick * 0.35;
+  for (let k = 3; k >= 1; k--) {
+    const p = tornadoPoint(t, Math.max(0, t.dist - k * 12));
+    const a = 0.3 - k * 0.08;
+    ctx.strokeStyle = `rgba(203, 213, 225, ${a})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 16 - k * 3, rot - k, rot - k + Math.PI * 1.2);
+    ctx.stroke();
+  }
   ctx.strokeStyle = 'rgba(203, 213, 225, 0.7)';
   for (let i = 0; i < 3; i++) {
     ctx.lineWidth = 2.5 - i * 0.6;
@@ -71,9 +82,20 @@ function drawTornado(ctx, world) {
   ctx.stroke();
 }
 
-// M10: the dashed path the user is dragging before release.
+// M10: what the user is dragging before release — a faint band the width of
+// the corridor (so the sweep's reach reads at a glance), the dashed center
+// line, a start ring where the head will spawn, and a dot at the cursor end.
 function drawTornadoDraft(ctx, draft) {
   if (draft.length < 2) return;
+  ctx.strokeStyle = 'rgba(203, 213, 225, 0.12)';
+  ctx.lineWidth = TORNADO_RADIUS * 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(draft[0].x, draft[0].y);
+  for (let i = 1; i < draft.length; i++) ctx.lineTo(draft[i].x, draft[i].y);
+  ctx.stroke();
+  ctx.lineCap = 'butt';
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
   ctx.lineWidth = 2;
   ctx.setLineDash([6, 6]);
@@ -82,8 +104,12 @@ function drawTornadoDraft(ctx, draft) {
   for (let i = 1; i < draft.length; i++) ctx.lineTo(draft[i].x, draft[i].y);
   ctx.stroke();
   ctx.setLineDash([]);
+  const last = draft[draft.length - 1];
   ctx.beginPath();
-  ctx.arc(draft[draft.length - 1].x, draft[draft.length - 1].y, 4, 0, Math.PI * 2);
+  ctx.arc(draft[0].x, draft[0].y, 6, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
   ctx.stroke();
 }
 

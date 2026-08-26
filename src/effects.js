@@ -27,11 +27,13 @@
 //   (world.tornado); tickTornado(world) — called from world.tick — advances
 //   the head TORNADO_SPEED px/tick along the path. A corridor of
 //   TORNADO_RADIUS around the head clears plants and deals TORNADO_DMG
-//   energy/tick to creatures (deathCause 'hazard'). At the path end the head
-//   lingers TORNADO_LINGER ticks, then world.tornado = null. A path shorter
-//   than MIN_TORNADO px (a plain click, no drag) releases nothing. Corridor
-//   geometry is toroidal; the path itself is screen space (a drag across the
-//   seam draws one long chord).
+//   energy/tick to creatures (deathCause 'hazard'). A full corridor pass is
+//   ~7 ticks, so a full-energy creature (120) dies to a clean sweep while a
+//   graze (1-3 ticks) only wounds — the tornado "catches" things it crosses.
+//   At the path end the head lingers TORNADO_LINGER ticks, then
+//   world.tornado = null. A path shorter than MIN_TORNADO px (a plain click,
+//   no drag) releases nothing. Corridor geometry is toroidal; the path itself
+//   is screen space (a drag across the seam draws one long chord).
 // - All other geometry is toroidal (the world wraps).
 
 import { W, H, wrap, PLANT_MAX_ENERGY } from './world.js';
@@ -58,7 +60,7 @@ const FERT_STRENGTH = 0.5; // fresh core: bud threshold x (1 - 0.5) = 60 energy
 // M10 tornado.
 export const TORNADO_SPEED = 6;   // px/tick along the drawn path
 export const TORNADO_RADIUS = 20; // corridor half-width
-const TORNADO_DMG = 8;            // creature energy/tick inside the corridor
+const TORNADO_DMG = 20;           // creature energy/tick inside the corridor
 export const TORNADO_LINGER = 40; // ticks the head dwells at the path end
 const MIN_TORNADO = 24;           // px of path needed to release (else a click cancels)
 

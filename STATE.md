@@ -23,7 +23,11 @@ so a fresh session can resume without re-reading everything.
 - M10 tornado + boons: DONE (Tornado = arm → drag a path → release; the head
   rips along it clearing plants and damaging creatures; Feast drops a mature
   plant cluster + energy-gain zone; Perk drops a fertility zone that halves
-  the bud threshold to 60 in its core)
+  the bud threshold to 60 in its core). Post-review fix: the tornado was
+  too subtle to read and too weak to feel (user saw creatures "just keep
+  moving"), so corridor damage is 20 energy/tick (a full ~7-tick pass kills
+  a full-energy creature), the drag shows a faint corridor band the width of
+  the hazard, and the head leaves a fading wake.
 - All spec milestones complete; M7/M8/M9/M10 were user-directed features
   after browser review.
 - Published: github.com/TheAmericanMaker/evolutionary-arena (public, MIT,
@@ -67,7 +71,8 @@ Full public version in ROADMAP.md. Waves:
   growth-freeze + ttl expiry, s3/s4 terrain scars, rad falloff + decay,
   rad-amplified offspring mutation vs control, death-cause/birth tally),
   tornado.test.js (9: M10 — click releases no tornado, head speed + clamp,
-  corridor clears plants / damages creatures (deathCause 'hazard'), expire
+   corridor clears plants / damages creatures incl. a full-energy (120)
+   victim dying to a clean pass (deathCause 'hazard'), expire
   after path + linger, feast cluster + gain zone, feast grants energy via
   world.tick vs control world, fert mult falloff, bud at 70 inside the core
   but not outside, boon ttls (feast 300 outlives perk 240))
@@ -247,10 +252,13 @@ Full public version in ROADMAP.md. Waves:
        linger, x, y } on world.tornado. tickTornado(world) — called from
        world.tick after the creature loop, before the death tally — advances
        the head TORNADO_SPEED=6 px/tick along the polyline (tornadoPoint
-       interpolates by arc length), clears plants and deals TORNADO_DMG=8
+       interpolates by arc length), clears plants and deals TORNADO_DMG=20
        energy/tick to creatures within TORNADO_RADIUS=20 (toroidal; deaths
-       = 'hazard'), then lingers TORNADO_LINGER=40 ticks at the path end and
-       clears. The path is screen space (a seam-crossing drag is one long
+       = 'hazard') — a full corridor pass is ~7 ticks ≈ 140 damage, so a
+       full-energy (120) creature dies to a clean sweep while a 1-3 tick
+       graze only wounds (post-review tuning; was 8, which let full-energy
+       creatures shrug off the pass) — then lingers TORNADO_LINGER=40 ticks
+       at the path end and clears. The path is screen space (a seam-crossing drag is one long
        chord); only the corridor geometry wraps.
      - effects.js boons on the M9 zone layer: feast(world,x,y) drops
        FEAST_PLANTS=8 mature plants (energy PLANT_MAX_ENERGY) in a
@@ -267,16 +275,20 @@ Full public version in ROADMAP.md. Waves:
      - world.js: world.tornado = null in createWorld; tick() applies
        gainAt per creature (after the M9 drain) and calls tickTornado()
        before effects.tick() so tornado deaths tally in the same tick.
-     - ui.js: Tornado = arm → mousedown starts the draft path, mousemove
-       appends points >=12 px apart (render.js draws the dashed draft +
-       end dot), mouseup calls startTornado, pushes a 2×radius fx ring at
+      - ui.js: Tornado = arm → mousedown starts the draft path, mousemove
+        appends points >=12 px apart (render.js draws the corridor band +
+        dashed centerline + start ring + end dot while dragging), mouseup
+        calls startTornado, pushes a 2×radius fx ring at
        the path start, sets shake 4, and always disarms (one-shot).
        Feast/Perk are one-shot arm modes like Impact: next canvas click
        drops the boon (fx rings 80 / 90 px) and disarms.
-     - render.js: render(ctx, world, fx, shake, draft) — drawTornado paints
-       three rotating arcs + the corridor ring at the head; drawZones gains
-       feast (amber) and fert (pink) fades; drawTornadoDraft draws the
-       dashed path while dragging.
+      - render.js: render(ctx, world, fx, shake, draft) — drawTornado paints
+        three rotating arcs + the corridor ring at the head, plus a fading
+        wake (three trailing arcs sampled 12/24/36 px back along the path,
+        clamped at the start) so a 6 px/tick sweep is visible; drawZones
+        gains feast (amber) and fert (pink) fades; drawTornadoDraft draws
+        a faint band 2×TORNADO_RADIUS wide (round caps) under the dashed
+        centerline so the sweep's reach reads before release.
      - engine.js: app.tornadoDraft (ui's draft path, passed to render);
        while world.tornado is live the frame loop holds a shake floor of 2.
      - index.html: Tornado/Feast/Perk buttons after the severity label;

@@ -60,6 +60,7 @@ test('the corridor clears plants and damages creatures', () => {
   w.plants.push({ x: 200, y: 320, energy: 20 }); // in the corridor
   w.plants.push({ x: 200, y: 200, energy: 20 }); // 120px off the path
   const victim = put(w, 150, 320, 5);
+  const full = put(w, 300, 320, 120);
   const safe = put(w, 250, 200, 60);
   for (let i = 0; i < 100; i++) tickTornado(w); // 50 travel + 40 linger + slack
   assert.equal(w.tornado, null, 'the tornado is over');
@@ -67,6 +68,8 @@ test('the corridor clears plants and damages creatures', () => {
   assert.ok(!w.plants[1].dead, 'off-path plant untouched');
   assert.equal(victim.dead, true, 'low-energy creature in the corridor died');
   assert.equal(victim.deathCause, 'hazard');
+  assert.equal(full.dead, true, 'a full-energy creature dies to a clean pass');
+  assert.equal(full.deathCause, 'hazard');
   assert.equal(safe.dead, false);
   assert.equal(safe.energy, 60, 'creature outside the corridor unharmed');
 });
