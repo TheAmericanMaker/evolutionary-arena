@@ -32,11 +32,17 @@ local model can produce end-to-end — as it is an ecosystem toy.
 
 ## Run
 
-The app must be served over HTTP (browsers block ES modules on `file://`):
+The app must be served over HTTP (browsers block ES modules on `file://`).
+The repo ships a small dev-server wrapper you can kill cleanly:
 
-    python3 -m http.server 8000
+    scripts/serve.sh          # start in the background
+    scripts/serve.sh status   # is it up?
+    scripts/serve.sh stop     # kill it
 
-then open <http://localhost:8000/>. It works fully offline in any modern browser.
+then open <http://localhost:8000/>. It works fully offline in any modern
+browser. (A plain `python3 -m http.server 8000` works too, but then you have
+to hunt down its pid to stop it — a server left in a dead shell session can
+hang with its accept queue full.)
 
 ## Controls
 
