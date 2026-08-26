@@ -21,8 +21,12 @@ so a fresh session can resume without re-reading everything.
   screen shake + blast ring; side stats panel with population/ecosystem/
   evolution breakdowns)
 - All spec milestones complete; M7/M8/M9 were user-directed features after
-  browser review. M10 (tornado + boons) is planned but not started — see
-  Decisions.
+  browser review. M10 (tornado + boons) is in progress — see Decisions.
+- Published: github.com/TheAmericanMaker/evolutionary-arena (public, MIT,
+  README + provenance section, LICENSE, .gitignore).
+- Workflow change (user-directed): all work happens on the `qwen-dev`
+  branch; changes reach `main` only via PRs that the human reviews before
+  merging. Never commit features directly to main.
 
 Milestone rule: one milestone per turn, then STOP for human browser review.
 Do not auto-advance. End every turn with a 1–2 sentence done summary plus
@@ -30,6 +34,22 @@ what the human should smoke-test. `node --test` from project root must be
 green, then commit the milestone: one commit per milestone, message format
 `M<n>: <kebab-case summary>` (e.g. `M6: polish sparkline best-lineage-card
 plant-rate-tuning`). Only that milestone's changes in the commit.
+
+## Roadmap backlog
+
+Full public version in ROADMAP.md. Waves:
+- W1: M10 tornado+boons (in progress), CI (GH Actions running node --test),
+  determinism regression test (same seed, two worlds, identical state),
+  seed display + copy in HUD.
+- W2 (make evolution visible): color-by-lineage toggle (diet|lineage|size),
+  lineage detail view (age, population, per-generation trait drift), trait
+  drift sparklines in the stats panel, aging (per-tick cost grows with age).
+- W3 (deepen sim): metabolic trade-offs (speed/size burn energy — currently
+  drift pushes all traits to their max), seasonal plant cycles (regen pool
+  pulses), scenario presets (Drought, Ice Age, Mutagen Storm, Purge).
+- W4 (shareability): screenshot capture (canvas+stats PNG), README
+  screenshot/GIF, interactive population chart (hover, diet series),
+  responsive scale. Out of scope: audio, touch, multiplayer.
 
 ## Tests
 
@@ -208,11 +228,15 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
     crater pixels distinct from water/open (the fresh glow tints them, so
     pixel asserts are "distinctly not water/background", exact colors are
     the tile ids), no creature sits in the new rock, zero console errors.
-  - M10 plan (next milestone): Tornado = mousedown→drag→release polyline,
-    head travels ~6px/tick, ~20px corridor clears plants/damages; boons
-    Feast (energy plant cluster + feast zone) and Perk (shield or fertility
-    zone) — both ride the same effects.js zone layer (add kinds
-    'feast'/'shield'/'fert').
+  - M10 plan (IN PROGRESS this turn, on qwen-dev): Tornado =
+    mousedown→drag→release polyline, head travels 6px/tick, 20px corridor
+    clears plants/damages creatures, ends at path end; boons ride the
+    effects.js zone layer — Feast (mature plant cluster + 'feast' zone that
+    grants energy/tick) and Perk ('fert' zone: bud threshold halved to 60
+    inside).
+  - M11 plan (next milestone): W1 remainder — GitHub Actions CI running
+    `node --test`, determinism regression test (same seed, two worlds, N
+    ticks, identical state hash), seed display + copy in HUD.
 - M6 tuning decision: DEFAULT_PLANT_RATE 0.05 → 0.3 (index.html slider now
   0..0.5, default 0.30). Grid probe (plantRate × mutation, 3000–5000 tick
   runs, 5 seeds) showed plant inflow is the dominant boom/crash lever
