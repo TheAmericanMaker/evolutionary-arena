@@ -8,11 +8,15 @@ import { BIOMES, TILE } from './terrain.js';
 // engine can prune app.fx with the same horizon the renderer fades over.
 export const SPAWN_FX_TICKS = 90;
 
-export function render(ctx, world, fx = []) {
+// M9: `shake` (px, decaying in engine.js) jitters the whole frame.
+export function render(ctx, world, fx = [], shake = 0) {
+  if (shake >= 0.5) ctx.save();
+  if (shake >= 0.5) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
   ctx.fillStyle = '#0b0e14';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(-8, -8, W + 16, H + 16);
   ctx.drawImage(terrainLayer(world), 0, 0);
   drawGrid(ctx);
+  drawZones(ctx, world);
   ctx.fillStyle = '#4ade80';
   for (const p of world.plants) {
     ctx.beginPath();
@@ -21,6 +25,25 @@ export function render(ctx, world, fx = []) {
   }
   for (const c of world.creatures) drawCreature(ctx, c);
   drawSpawnFx(ctx, fx, world.tick);
+  if (shake >= 0.5) ctx.restore();
+}
+
+// M9: hazard zone glows — scorch fades with its ttl, rad is a steady green.
+function drawZones(ctx, world) {
+  for (const z of world.effects.zones) {
+    const fade = z.ttl / z.maxTtl;
+    let fill;
+    if (z.kind === 'scorch') fill = `rgba(248, 113, 113, ${0.05 + 0.04 * z.power * (0.5 + 0.5 * fade)})`;
+    else if (z.kind === 'rad') fill = `rgba(74, 222, 128, ${0.06 + 0.05 * fade})`;
+    else continue;
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = fill;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
 }
 
 // M8: the biome layer, baked once to an offscreen canvas and re-baked only
@@ -51,6 +74,11 @@ function terrainLayer(world) {
         } else if (b.name === 'rock') {
           c2.fillStyle = '#1c2028';
           c2.fillRect(tx * TILE + 5, ty * TILE + 5, TILE - 10, TILE - 10);
+        } else if (b.name === 'scorched') {
+          c2.fillStyle = '#3d2a1a';
+          c2.fillRect(tx * TILE + ((tx * 47 + ty * 23) % 24) + 4, ty * TILE + ((tx * 17 + ty * 83) % 24) + 4, 3, 2);
+          c2.fillStyle = '#2a1d12';
+          c2.fillRect(tx * TILE + ((tx * 71 + ty * 11) % 26) + 3, ty * TILE + ((tx * 41 + ty * 67) % 26) + 3, 2, 2);
         }
       }
     }
@@ -60,16 +88,19 @@ function terrainLayer(world) {
 }
 
 // M7: expanding fading ring where the user spawned a creature (spawn goes to
-// a random toroidal spot, so without a marker the button looks dead).
+// a random toroidal spot, so without a marker the button looks dead). M9: an
+// fx can carry `ring` (max radius) — impact blasts expand out to their blast
+// radius instead of the spawn ring's 30px.
 function drawSpawnFx(ctx, fx, tick) {
   for (const f of fx) {
     const t = Math.min(1, (tick - f.t) / SPAWN_FX_TICKS);
     if (t < 0) continue;
+    const maxR = f.ring || 30;
     ctx.globalAlpha = 0.9 * (1 - t);
     ctx.strokeStyle = `hsl(${f.hue}, 80%, 60%)`;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = f.ring ? 3 : 2;
     ctx.beginPath();
-    ctx.arc(f.x, f.y, 4 + t * 26, 0, Math.PI * 2);
+    ctx.arc(f.x, f.y, 4 + t * (maxR - 4), 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;

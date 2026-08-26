@@ -124,7 +124,7 @@ export function updateCreature(c, world) {
     prey.energy -= loss;
     c.energy = Math.min(MAX_ENERGY, c.energy + loss);
     c.gain += loss;
-    if (prey.energy <= 0) prey.dead = true;
+    if (prey.energy <= 0) { prey.dead = true; prey.deathCause = 'predation'; }
   }
   if (!bit) {
     if (desired !== null) {
@@ -178,7 +178,9 @@ export function updateCreature(c, world) {
       x: bx,
       y: by,
       heading: rng.next() * Math.PI * 2,
-      dna: mutateDna(c.dna, world.settings.mutationRate, rng),
+      // M9: offspring inherit the parent's location, so a parent inside a
+      // rad cloud breeds with the (up to 10x) amplified mutation rate.
+      dna: mutateDna(c.dna, world.settings.mutationRate * world.effects.radMultAt(c.x, c.y), rng),
       energy: OFFSPRING_ENERGY,
       lineageId: c.lineageId,
       generation: c.generation + 1,
@@ -190,6 +192,6 @@ export function updateCreature(c, world) {
   const met = c.dna.metabolism * world.terrain.metaMultAt(c.x, c.y);
   c.energy = Math.max(0, c.energy - met);
   c.spent += met;
-  if (c.energy <= 0) c.dead = true;
+  if (c.energy <= 0) { c.dead = true; c.deathCause = 'starve'; }
   return null;
 }

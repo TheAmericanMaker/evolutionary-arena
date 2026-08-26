@@ -14,6 +14,7 @@ import { createSpatial } from './spatial.js';
 import { createCreature, updateCreature, OFFSPRING_ENERGY } from './entity.js';
 import { createStats, createRecords } from './stats.js';
 import { createTerrain } from './terrain.js';
+import { createEffects } from './effects.js';
 
 export const W = 1024;
 export const H = 640;
@@ -67,6 +68,10 @@ export function createWorld(seed = 1) {
   world.creatureGrid = createSpatial(W, H);
   world.stats = createStats();
   world.records = createRecords();
+  // M9: hazard zone layer (effects.js) + life accounting for the stats panel.
+  world.effects = createEffects();
+  world.deaths = { starve: 0, predation: 0, hazard: 0, user: 0 };
+  world.births = 0;
   for (let i = 0; i < INITIAL_CREATURES; i++) {
     const spot = freeSpot(world);
     world.creatures.push(createCreature({
@@ -111,7 +116,18 @@ export function tick(world) {
   for (const c of world.creatures) {
     if (c.dead) continue;
     const child = updateCreature(c, world);
-    if (child) newborns.push(child);
+    if (child) { newborns.push(child); world.births += 1; }
+    // M9: hazard zones drain energy after the normal tick; a creature that
+    // hits 0 here died to the hazard, not to metabolism.
+    const drain = world.effects.drainAt(c.x, c.y);
+    if (drain > 0 && !c.dead) {
+      c.energy = Math.max(0, c.energy - drain);
+      if (c.energy <= 0) { c.dead = true; c.deathCause = 'hazard'; }
+    }
+  }
+  world.effects.tick();
+  for (const c of world.creatures) {
+    if (c.dead) world.deaths[c.deathCause || 'starve'] += 1;
   }
   world.plants = world.plants.filter((p) => !p.dead);
   world.creatures = world.creatures.filter((c) => !c.dead).concat(newborns);
@@ -152,12 +168,12 @@ function growPlants(world) {
   const { rng, settings, terrain } = world;
   world.plantPool = Math.min(PLANT_POOL_MAX, world.plantPool + PLANT_REGEN);
   if (world.plants.length < MAX_PLANTS && world.plantPool >= PLANT_COST && rng.next() < settings.plantRate) {
-    // M8: sprouts need a plantable tile — retry up to 16 times, else the
-    // regen is deferred (pool keeps filling toward its cap).
+    // M8: sprouts need a plantable tile; M9: never on hazard ground — retry
+    // up to 16 times, else the regen is deferred (pool fills toward its cap).
     for (let i = 0; i < 16; i++) {
       const x = rng.next() * W;
       const y = rng.next() * H;
-      if (terrain.plantMultAt(x, y) > 0) {
+      if (terrain.plantMultAt(x, y) > 0 && !world.effects.blocksSprout(x, y)) {
         world.plantPool -= PLANT_COST;
         world.plants.push({ x, y, energy: 1 });
         break;
@@ -166,7 +182,8 @@ function growPlants(world) {
   }
   for (const p of world.plants) {
     // M8: biome climate — forest plants grow twice as fast, tundra half.
-    if (p.energy < PLANT_MAX_ENERGY) {
+    // M9: hazard ground freezes growth (ash, radiation).
+    if (p.energy < PLANT_MAX_ENERGY && !world.effects.blocksSprout(p.x, p.y)) {
       p.energy = Math.min(PLANT_MAX_ENERGY, p.energy + PLANT_GROWTH * terrain.plantMultAt(p.x, p.y));
     }
   }

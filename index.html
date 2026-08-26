@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <div id="frame">
   <header id="hud">
     <div class="hud-row">
       <span class="hud-item">tick <span id="tick">000000</span></span>
@@ -46,8 +47,14 @@
         <button class="swatch" data-biome="2" style="background:#262b36" title="Rock — impassable, no plants"></button>
         <button class="swatch" data-biome="3" style="background:#0f2018" title="Forest — plants grow 2x"></button>
         <button class="swatch" data-biome="4" style="background:#182230" title="Tundra — plants 0.5x, metabolism +25%"></button>
+        <button class="swatch" data-biome="5" style="background:#171210" title="Scorched — no plants, metabolism +10%"></button>
         <button class="swatch" data-biome="0" style="background:#0b0e14" title="Open — clear terrain"></button>
       </span>
+      <button id="impactBtn" class="btn" title="Arm, then click the canvas: meteor/nuke drop">Impact</button>
+      <label class="hud-item">severity
+        <input id="severity" type="range" min="1" max="4" step="1" value="3" />
+        <span id="severityVal">3</span>
+      </label>
       <button id="herbBtn" class="btn" title="Shift-click spawns 5">+Herbivore</button>
       <button id="carnBtn" class="btn" title="Shift-click spawns 5">+Carnivore</button>
       <button id="resetBtn" class="btn">Reset world</button>
@@ -55,19 +62,55 @@
     </div>
   </header>
   <main>
-    <canvas id="world" width="1024" height="640"></canvas>
-    <div id="splash"><div>
-      <h1>Evolutionary Arena</h1>
-      <p>paused — press space or hit Resume</p>
-      <div class="legend">
-        <span class="k">Click</span><span>inspect a creature / plant</span>
-        <span class="k">Shift + Click</span><span>×5 spawn (buttons) · splat (terrain)</span>
-        <span class="k">+Buttons</span><span>spawn a creature at a random spot</span>
-        <span class="k">Terrain</span><span>pick a swatch, then drag to paint</span>
-        <span class="k">Wheel</span><span>simulation speed</span>
-      </div>
-    </div></div>
+    <div id="stage">
+      <canvas id="world" width="1024" height="640"></canvas>
+      <div id="splash"><div>
+        <h1>Evolutionary Arena</h1>
+        <p>paused — press space or hit Resume</p>
+        <div class="legend">
+          <span class="k">Click</span><span>inspect a creature / plant</span>
+          <span class="k">Shift + Click</span><span>×5 spawn (buttons) · splat (terrain)</span>
+          <span class="k">+Buttons</span><span>spawn a creature at a random spot</span>
+          <span class="k">Terrain</span><span>pick a swatch, then drag to paint</span>
+          <span class="k">Impact</span><span>arm, then click — severity sets the size</span>
+          <span class="k">Wheel</span><span>simulation speed</span>
+        </div>
+      </div></div>
+    </div>
+    <aside id="statsPanel">
+      <section>
+        <h3>Population</h3>
+        <div class="stat-row"><span>creatures</span><span id="stCreatures">0</span></div>
+        <div class="stat-row"><span>herbivores</span><span id="stVeg" class="veg">0</span></div>
+        <div class="stat-row"><span>carnivores</span><span id="stCarn" class="carn">0</span></div>
+        <div class="stat-row"><span>peak</span><span id="stPeak">0</span></div>
+        <div class="stat-row"><span>born</span><span id="stBorn">0</span></div>
+        <div class="stat-row"><span>deaths</span><span id="stDeaths">0</span></div>
+        <div class="stat-row sub"><span>starve</span><span id="stStarve">0</span></div>
+        <div class="stat-row sub"><span>preyed</span><span id="stPred">0</span></div>
+        <div class="stat-row sub"><span>hazard</span><span id="stHazard">0</span></div>
+      </section>
+      <section>
+        <h3>Ecosystem</h3>
+        <div class="stat-row"><span>plants</span><span id="stPlants">0</span></div>
+        <div class="stat-row"><span>biomass</span><span id="stBiomass">0</span></div>
+        <div class="stat-row"><span>regen pool</span><span id="stPool">0</span></div>
+        <div class="stat-row"><span>avg energy</span><span id="stAvgE">0</span></div>
+      </section>
+      <section>
+        <h3>Evolution</h3>
+        <div class="stat-row"><span>lineages</span><span id="stLineages">0</span></div>
+        <div class="stat-row"><span>max gen</span><span id="stGen">—</span></div>
+        <div class="stat-row"><span>best fit</span><span id="stBest">—</span></div>
+        <div class="stat-row"><span>avg speed</span><span id="stAvgSpd">0</span></div>
+        <div class="stat-row"><span>avg vision</span><span id="stAvgVis">0</span></div>
+        <div class="stat-row"><span>avg metabolism</span><span id="stAvgMet">0</span></div>
+        <div class="stat-row"><span>avg aggression</span><span id="stAvgAgg">0</span></div>
+        <div class="stat-row"><span>avg size</span><span id="stAvgSize">0</span></div>
+      </section>
+    </aside>
   </main>
+  </div>
   <div id="inspect" hidden></div>
   <script type="module" src="src/engine.js"></script>
   <script>

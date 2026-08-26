@@ -32,6 +32,8 @@ import { HERBIVORE_DNA, CARNIVORE_DNA } from './dna.js';
 import { drawSparkline } from './render.js';
 import { fitness } from './stats.js';
 import { createWorld, tick, spawn, W, H, wrap } from './world.js';
+import { impact, impactRadius } from './effects.js';
+import { panelIds, updatePanel } from './panel.js';
 import { toroidDist } from './spatial.js';
 import { OFFSPRING_ENERGY, MAX_ENERGY } from './entity.js';
 
@@ -64,7 +66,9 @@ export function createUI(app) {
     resetBtn: $('resetBtn'), recordsBtn: $('recordsBtn'),
     splash: $('splash'), inspect: $('inspect'),
     terrainBtn: $('terrainBtn'), swatches: document.querySelectorAll('.swatch'),
+    impactBtn: $('impactBtn'), severity: $('severity'), severityVal: $('severityVal'),
   };
+  const panel = panelIds();
 
   const chartCtx = els.popChart.getContext('2d');
 
@@ -73,6 +77,7 @@ export function createUI(app) {
   let tool = 'plant'; // 'plant' | 'feed' | 'terrain'
   let paintBiome = 1;
   let killArmed = false;
+  let impactArmed = false;
   let userSeq = 0;
   let painting = null;
 
@@ -109,6 +114,15 @@ export function createUI(app) {
   els.killBtn.addEventListener('click', () => {
     killArmed = !killArmed;
     els.killBtn.classList.toggle('armed', killArmed);
+  });
+  // M9: one-shot arm like Kill — the next canvas click drops the impact.
+  // Severity (1..4) comes from the slider; s3+ scars the terrain (effects.js).
+  els.impactBtn.addEventListener('click', () => {
+    impactArmed = !impactArmed;
+    els.impactBtn.classList.toggle('armed', impactArmed);
+  });
+  els.severity.addEventListener('input', () => {
+    els.severityVal.textContent = els.severity.value;
   });
   els.terrainBtn.addEventListener('click', () => setTool(tool === 'terrain' ? 'plant' : 'terrain'));
   for (const sw of els.swatches) {
@@ -219,12 +233,23 @@ export function createUI(app) {
   els.canvas.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
     const { x, y } = worldPos(e);
+    if (impactArmed) {
+      impactArmed = false;
+      els.impactBtn.classList.remove('armed');
+      const s = impact(app.world, x, y, Number(els.severity.value) || 2);
+      app.fx.push({ x, y, t: app.world.tick, hue: 15, ring: impactRadius(s) });
+      app.shake = 3 + 2.5 * s;
+      clearInspect();
+      return;
+    }
     if (e.shiftKey) { clearInspect(); scatter(x, y); return; }
     if (killArmed) {
       killArmed = false;
       els.killBtn.classList.remove('armed');
       const victim = creatureAt(x, y, KILL_RADIUS);
       if (victim) {
+        // Bypasses the dead-filter, so tally the user kill directly.
+        app.world.deaths.user += 1;
         app.world.creatures = app.world.creatures.filter((c) => c !== victim);
         clearInspect();
       }
@@ -283,6 +308,7 @@ export function createUI(app) {
     els.speedVal.textContent = String(speed());
     els.plantRateVal.textContent = Number(els.plantRate.value).toFixed(2);
     els.mutationVal.textContent = Number(els.mutation.value).toFixed(2);
+    updatePanel(panel, w); // M9 side readout
     refreshInspect();
   }
 

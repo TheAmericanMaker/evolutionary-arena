@@ -15,9 +15,14 @@ so a fresh session can resume without re-reading everything.
   tracked inspect line, splash controls legend, file:// watchdog)
 - M8 terrain & biomes: DONE (seeded biome generation + paintable Terrain
   tool; water/rock impassable, forest/tundra climate multipliers)
-- All spec milestones complete; M7/M8 were user-directed features after
-  browser review. M9 (hazard drops) and M10 (tornado + boons) are planned
-  but not started — see Decisions.
+- M9 hazard drops: DONE (Impact tool + severity 1..4; blast kill/damage
+  falloff; s3 scorches the crater, s4 rocks the core + scorches the rim +
+  rad cloud; scorch drains/blocks plants; rad amplifies mutation up to 10x;
+  screen shake + blast ring; side stats panel with population/ecosystem/
+  evolution breakdowns)
+- All spec milestones complete; M7/M8/M9 were user-directed features after
+  browser review. M10 (tornado + boons) is planned but not started — see
+  Decisions.
 
 Milestone rule: one milestone per turn, then STOP for human browser review.
 Do not auto-advance. End every turn with a 1–2 sentence done summary plus
@@ -28,22 +33,27 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
 
 ## Tests
 
-`node --test` → 54 pass / 0 fail (verified this session).
+`node --test "tests/*.test.js"` → 63 pass / 0 fail (verified this session).
 - rng.test.js (5), world.test.js (14: +spawn, +M8 terrain), dna.test.js
   (7: +standard genomes), entity.test.js (8: +M8 water steering),
   predation.test.js (7), stats.test.js (6: +fitness, records
   note/load/reset), terrain.test.js (7: M8 — determinism, valid ids, open
-  dominance, toroidal lookups, biome data, paint/version, grid coverage)
+  dominance, toroidal lookups, biome data, paint/version, grid coverage),
+  effects.test.js (9: M9 — blast radii, kill/damage falloff, scorch drain +
+  growth-freeze + ttl expiry, s3/s4 terrain scars, rad falloff + decay,
+  rad-amplified offspring mutation vs control, death-cause/birth tally)
 - M8 note: createWorld now generates terrain, so movement/plant tests that
   assert fixed coordinates call clearTerrain(world.terrain) to control the
   layer (seed 3's plant-growth test and the predation chase/flee tests).
 - DOM is not unit tested; instead /tmp/ui-smoke.mjs boots the real
-  engine.js against a minimal DOM stub and exercises every control (17
+  engine.js against a minimal DOM stub and exercises every control (18
   checks: M5's 13 — boot-paused, resume/space/step, spawn, inspect, kill,
   plant/feed brush, scatter, wheel clamp, records persist/reset, world
   reset — M6: sparkline draw calls, best-lineage card content, sparkline
   survives a post-reset empty window — M8: swatch arms terrain tool, drag
-  paints tiles, version bumps for the bake, brush click leaves the mode).
+  paints tiles, version bumps for the bake, brush click leaves the mode —
+  M9: impact arms, s4 drop scars rock core + scorched rim, rad/scorch
+  zones added, shake + 180px blast ring pushed, side panel populates).
   Re-run:
   `node /tmp/ui-smoke.mjs` from the project root (tmp file, may vanish
   after reboot — it is disposable, the real gate is node --test).
@@ -142,15 +152,67 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
     canvas (open still dominant), swatch→drag paints tiles (typeAt 0→1),
     version bumps, water pixels render after re-bake, no creature sits in
     water, zero console errors.
-  - M9 plan (next milestone): src/effects.js per-tick zone layer
-    {kind, power, ttl} decaying; single Impact tool + severity slider
-    1..4 (R = 40s+20 → 60/100/140/180px), kill radius 0.5R, energy damage
-    falloff, scorch ttl 150·s, radiation only at s=4 (power 1.0, slow
-    decay); effective mutation ×(1+9·power) (up to 10×) + small energy
-    drain; shockwave ring via app.fx + screen shake.
-  - M10 plan: Tornado = mousedown→drag→release polyline, head travels
-    ~6px/tick, ~20px corridor clears plants/damages; boons Feast (energy
-    plant cluster + feast zone) and Perk (shield or fertility zone).
+- M9 decisions (user-directed: bigger impacts must change terrain; add a
+  side stats readout with evolution detail):
+  - New effects.js: zone layer owned by the world (world.effects), ticked
+    in world.tick(). Zones {kind, x, y, r, power, ttl, maxTtl}:
+    - scorch (every impact): drain SCORCH_DRAIN=1.5 × power × (1 - d/r)
+      energy/tick, blocks sprouting AND freezes plant growth (ash);
+      ttl = 150·s.
+    - rad (s4 only): slow constant drain RAD_DRAIN=0.03 × (1 - d/r) plus
+      the mutation hook — offspring bred inside inherit the parent's spot,
+      so updateCreature's bud uses mutationRate × radMultAt, where
+      radMultAt = max over rad zones of 1 + 9·power·(1 - d/r)·(ttl/maxTtl)
+      → 10× at a fresh core, decaying linearly to 1 at expiry (ttl 900).
+      mutateDna itself is unchanged (always mutates at rate>0; sigma scales
+      with rate), so radiation widens the spread, not the odds.
+  - Impact(x, y, s): R = 40s+20 (60/100/140/180). d < 0.5R → dead
+    (deathCause 'hazard'); 0.5R..R → 25s×(1-d/R) energy damage to
+    creatures and plants. Terrain scars: s1-2 none; s3 → crater (d < 0.6R)
+    painted scorched id 5; s4 → core (d < 0.45R) rock id 2 (impassable),
+    rim (0.45R..0.75R) scorched, + rad cloud r=1.25R.
+  - terrain.js: biome id 5 scorched — passable, unplantable (plantMult 0),
+    metaMult 1.1 (mild climate cost), color #171210; paintable swatch.
+  - world.js: world.deaths {starve, predation, hazard, user} + world.births
+    (buds only; user spawns are not offspring). Tick: births++ per bud,
+    zone drain applied after each creature's update (a 0-energy death here
+    is 'hazard'), effects.tick(), then death-cause tally before the
+    dead-filter. User Kill bypasses the dead-filter, so ui.js increments
+    deaths.user directly.
+  - entity.js: deathCause set at each death site ('starve' at the met
+    drain, 'predation' on a killing bite); bud mutation rate =
+    settings.mutationRate × effects.radMultAt(parent spot).
+  - ui.js: Impact button = one-shot arm mode like Kill (severity slider
+    1..4, default 3); on drop: impact(), blast fx {ring: R} (render expands
+    out to the blast radius instead of the 30px spawn ring), app.shake =
+    3 + 2.5s, inspect cleared. hud() now also calls updatePanel().
+  - New panel.js: updatePanel(els, world) — pure DOM writes from world
+    state, ids collected once via panelIds(). Sections: Population (live
+    count, herbivore/carnivore split via isCarnivore, all-time peak,
+    births, deaths by cause), Ecosystem (plants, biomass = total plant
+    energy, regen pool, avg energy), Evolution (distinct live lineages,
+    max generation + lineage, all-time best fitness, and the LIVE mean of
+    all 5 DNA traits — "what the population is becoming").
+  - render.js: render(ctx, world, fx, shake) — shake ≥0.5 translates the
+    frame by ±shake/2 random (engine decays shake ×0.85/frame to 0);
+    drawZones paints scorch (red, alpha 0.05 + 0.04·power·(0.5+0.5fade))
+    and rad (green, 0.06 + 0.05·fade) glows after terrain, before plants;
+    scorched tiles get deterministic ash speckles in the bake.
+  - index.html: HUD row gains Impact + severity slider; 6th swatch
+    (scorched); canvas wrapped in #stage and #statsPanel sits beside it
+    (224px, HUD+canvas+panel share one left-aligned #frame column); splash
+    legend gains the Impact line.
+  - Verified in headless Chromium (test6.mjs): panel visible + populating
+    (counts, lineages, trait means), s4 drop → rock core (impassable) +
+    scorched rim + rad/scorch zones + hazard deaths, far tile untouched,
+    crater pixels distinct from water/open (the fresh glow tints them, so
+    pixel asserts are "distinctly not water/background", exact colors are
+    the tile ids), no creature sits in the new rock, zero console errors.
+  - M10 plan (next milestone): Tornado = mousedown→drag→release polyline,
+    head travels ~6px/tick, ~20px corridor clears plants/damages; boons
+    Feast (energy plant cluster + feast zone) and Perk (shield or fertility
+    zone) — both ride the same effects.js zone layer (add kinds
+    'feast'/'shield'/'fert').
 - M6 tuning decision: DEFAULT_PLANT_RATE 0.05 → 0.3 (index.html slider now
   0..0.5, default 0.30). Grid probe (plantRate × mutation, 3000–5000 tick
   runs, 5 seeds) showed plant inflow is the dominant boom/crash lever

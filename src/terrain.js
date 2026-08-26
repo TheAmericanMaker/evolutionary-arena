@@ -1,11 +1,12 @@
 // Terrain: static per-tile biome layer under the simulation (M8).
 // Decisions:
-// - TILE=32px tiles (32x20 on the 1024x640 world). Tile ids 0..4 in a
+// - TILE=32px tiles (32x20 on the 1024x640 world). Tile ids 0..5 in a
 //   Uint8Array; biome data in BIOMES (index = id).
 // - Biomes: open (default), water/rock (impassable, no plants), forest
 //   (plant growth x2 — "trees" as a dense biome, not individual entities),
 //   tundra (plant growth x0.5, creature metabolism x1.25 — the "climate"
-//   hook: per-tile plantMult/metaMult).
+//   hook: per-tile plantMult/metaMult), scorched (M9: passable dead ground —
+//   no plants, metabolism x1.1; the scar left by big impacts, paintable).
 // - Generation = seeded blob fields: a few random centers per type, toroidal
 //   distance, per-tile edge jitter (0.8..1.2 x radius) for organic borders.
 //   Forest is drawn last so it trims water shores. Open stays dominant.
@@ -23,6 +24,7 @@ export const BIOMES = [
   { name: 'rock',   passable: false, plantable: false, plantMult: 0,    metaMult: 1,    color: '#262b36' },
   { name: 'forest', passable: true,  plantable: true,  plantMult: 2,    metaMult: 1,    color: '#0f2018' },
   { name: 'tundra', passable: true,  plantable: true,  plantMult: 0.5,  metaMult: 1.25, color: '#182230' },
+  { name: 'scorched', passable: true, plantable: false, plantMult: 0,   metaMult: 1.1,  color: '#171210' },
 ];
 
 // Draw order = overwrite order: big soft biomes first, forest last.
