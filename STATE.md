@@ -35,6 +35,11 @@ so a fresh session can resume without re-reading everything.
 - Workflow change (user-directed): all work happens on the `qwen-dev`
   branch; changes reach `main` only via PRs that the human reviews before
   merging. Never commit features directly to main.
+- Local server (dev tooling, PR #3): manage the port-8000 dev server with
+  `scripts/serve.sh [start|stop|status]` — never hand-roll a backgrounded
+  `python3 -m http.server` (one left in a dead shell session can hang with a
+  full accept queue and block the port). stop finds the listener by port even
+  without a pidfile.
 
 Milestone rule: one milestone per turn, then STOP for human browser review.
 Do not auto-advance. End every turn with a 1–2 sentence done summary plus
