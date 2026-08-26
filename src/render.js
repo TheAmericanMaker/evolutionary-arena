@@ -2,6 +2,7 @@
 
 import { W, H } from './world.js';
 import { plantRadius, MAX_ENERGY } from './entity.js';
+import { BIOMES, TILE } from './terrain.js';
 
 // Lifetime of a spawn marker ring, in ticks (~1.5s at 1x). Exported so the
 // engine can prune app.fx with the same horizon the renderer fades over.
@@ -10,6 +11,7 @@ export const SPAWN_FX_TICKS = 90;
 export function render(ctx, world, fx = []) {
   ctx.fillStyle = '#0b0e14';
   ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(terrainLayer(world), 0, 0);
   drawGrid(ctx);
   ctx.fillStyle = '#4ade80';
   for (const p of world.plants) {
@@ -19,6 +21,42 @@ export function render(ctx, world, fx = []) {
   }
   for (const c of world.creatures) drawCreature(ctx, c);
   drawSpawnFx(ctx, fx, world.tick);
+}
+
+// M8: the biome layer, baked once to an offscreen canvas and re-baked only
+// when terrain.version changes (paint or world reset). Flat fills plus a
+// deterministic per-tile speckle so biomes don't read as flat rectangles.
+let terrainCache = null;
+function terrainLayer(world) {
+  const t = world.terrain;
+  if (!terrainCache || terrainCache.version !== t.version) {
+    const cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    const c2 = cv.getContext('2d');
+    for (let ty = 0; ty < t.rows; ty++) {
+      for (let tx = 0; tx < t.cols; tx++) {
+        const b = BIOMES[t.tiles[ty * t.cols + tx]];
+        if (!b.color) continue;
+        c2.fillStyle = b.color;
+        c2.fillRect(tx * TILE, ty * TILE, TILE, TILE);
+        if (b.name === 'forest') {
+          c2.fillStyle = '#1d3b2a';
+          for (let k = 0; k < 3; k++) {
+            c2.fillRect(tx * TILE + ((tx * 53 + ty * 97 + k * 37) % 24) + 4, ty * TILE + ((tx * 31 + ty * 71 + k * 59) % 24) + 4, 3, 3);
+          }
+        } else if (b.name === 'tundra') {
+          c2.fillStyle = '#24344d';
+          c2.fillRect(tx * TILE + ((tx * 37 + ty * 61) % 20) + 5, ty * TILE + ((tx * 13 + ty * 29) % 20) + 5, 4, 2);
+        } else if (b.name === 'rock') {
+          c2.fillStyle = '#1c2028';
+          c2.fillRect(tx * TILE + 5, ty * TILE + 5, TILE - 10, TILE - 10);
+        }
+      }
+    }
+    terrainCache = { version: t.version, canvas: cv };
+  }
+  return terrainCache.canvas;
 }
 
 // M7: expanding fading ring where the user spawned a creature (spawn goes to

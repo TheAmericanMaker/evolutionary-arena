@@ -40,6 +40,14 @@
       <button id="stepBtn" class="btn">Step</button>
       <button id="brushBtn" class="btn">Brush: Plant</button>
       <button id="killBtn" class="btn">Kill under cursor</button>
+      <button id="terrainBtn" class="btn" title="Paint biomes: drag on the canvas">Terrain</button>
+      <span id="biomeSwatches">
+        <button class="swatch active" data-biome="1" style="background:#0c2038" title="Water — impassable, no plants"></button>
+        <button class="swatch" data-biome="2" style="background:#262b36" title="Rock — impassable, no plants"></button>
+        <button class="swatch" data-biome="3" style="background:#0f2018" title="Forest — plants grow 2x"></button>
+        <button class="swatch" data-biome="4" style="background:#182230" title="Tundra — plants 0.5x, metabolism +25%"></button>
+        <button class="swatch" data-biome="0" style="background:#0b0e14" title="Open — clear terrain"></button>
+      </span>
       <button id="herbBtn" class="btn" title="Shift-click spawns 5">+Herbivore</button>
       <button id="carnBtn" class="btn" title="Shift-click spawns 5">+Carnivore</button>
       <button id="resetBtn" class="btn">Reset world</button>
@@ -51,7 +59,7 @@
     <div id="splash"><div>
       <h1>Evolutionary Arena</h1>
       <p>paused — press space or hit Resume</p>
-      <p class="hint">canvas click: inspect a creature / plant · shift-click: ×5 · +buttons: shift-click = ×5</p>
+      <p class="hint">canvas click: inspect a creature / plant · shift-click: ×5 · +buttons: shift-click = ×5 · Terrain: pick a swatch, then drag</p>
     </div></div>
   </main>
   <div id="inspect" hidden></div>

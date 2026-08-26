@@ -13,8 +13,11 @@ so a fresh session can resume without re-reading everything.
 - M6 polish: DONE (chart, best-lineage card, tuning pass, acceptance)
 - M7 post-spec polish: DONE (spawn marker rings, shift-click ×5 spawn,
   tracked inspect line, splash controls legend, file:// watchdog)
-- All spec milestones complete; M7 was user-feedback polish after browser
-  review.
+- M8 terrain & biomes: DONE (seeded biome generation + paintable Terrain
+  tool; water/rock impassable, forest/tundra climate multipliers)
+- All spec milestones complete; M7/M8 were user-directed features after
+  browser review. M9 (hazard drops) and M10 (tornado + boons) are planned
+  but not started — see Decisions.
 
 Milestone rule: one milestone per turn, then STOP for human browser review.
 Do not auto-advance. End every turn with a 1–2 sentence done summary plus
@@ -25,16 +28,23 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
 
 ## Tests
 
-`node --test` → 41 pass / 0 fail (verified this session).
-- rng.test.js (5), world.test.js (10: +spawn), dna.test.js (7: +standard
-  genomes), entity.test.js (6), predation.test.js (7), stats.test.js
-  (6: +fitness, records note/load/reset)
+`node --test` → 54 pass / 0 fail (verified this session).
+- rng.test.js (5), world.test.js (14: +spawn, +M8 terrain), dna.test.js
+  (7: +standard genomes), entity.test.js (8: +M8 water steering),
+  predation.test.js (7), stats.test.js (6: +fitness, records
+  note/load/reset), terrain.test.js (7: M8 — determinism, valid ids, open
+  dominance, toroidal lookups, biome data, paint/version, grid coverage)
+- M8 note: createWorld now generates terrain, so movement/plant tests that
+  assert fixed coordinates call clearTerrain(world.terrain) to control the
+  layer (seed 3's plant-growth test and the predation chase/flee tests).
 - DOM is not unit tested; instead /tmp/ui-smoke.mjs boots the real
-  engine.js against a minimal DOM stub and exercises every control (16
+  engine.js against a minimal DOM stub and exercises every control (17
   checks: M5's 13 — boot-paused, resume/space/step, spawn, inspect, kill,
   plant/feed brush, scatter, wheel clamp, records persist/reset, world
-  reset — plus M6: sparkline draw calls, best-lineage card content,
-  sparkline survives a post-reset empty window). Re-run:
+  reset — M6: sparkline draw calls, best-lineage card content, sparkline
+  survives a post-reset empty window — M8: swatch arms terrain tool, drag
+  paints tiles, version bumps for the bake, brush click leaves the mode).
+  Re-run:
   `node /tmp/ui-smoke.mjs` from the project root (tmp file, may vanish
   after reboot — it is disposable, the real gate is node --test).
 
@@ -95,6 +105,52 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
   reset). window.__arena = app is a console/debug handle (browser smoke
   tests use it). Verified in headless Chromium: ring pixels confirmed by
   radial getImageData scan (pause freezes the ring at its radius).
+- M8 decisions (user-directed feature arc; user answered design questions:
+  generated+paintable terrain, single Impact+severity slider for hazards,
+  radiation = mutation multiplier + drain):
+  - New terrain.js: TILE=32 (32×20 tiles), biome ids 0..4 in a Uint8Array,
+    BIOMES table (open/water/rock/forest/tundra) with passable, plantable,
+    plantMult, metaMult, color. Generation = seeded blob fields (3 water, 3
+    rock, 2 tundra, 4 forest blobs; toroidal distance; edge jitter 0.8..1.2r;
+    forest drawn last to trim shores; open stays dominant ~55-70%).
+    paint(x,y,id) bumps version on real change; clearTerrain() for tests.
+  - world.js: world.terrain = createTerrain(rng) (consumes rng before spawn
+    placement — deterministic per seed). freeSpot() = 32 random passable
+    tries → coarse grid scan → world center; used by initial creatures and
+    spawn(). Sprouting retries up to 16× on plantable tiles (regen deferred
+    to the pool if none found). Plant growth × plantMultAt (forest 2×,
+    tundra 0.5×).
+  - entity.js: movement — if the step along the heading is blocked (water/
+    rock), align in one tick to the first open shore direction (±45° then
+    ±90°, right-first) and step along it; if all blocked, hold ground and
+    re-steer next tick. Deliberate choice: direct alignment (not gradual
+    MAX_TURN steering) — gradual turns overshot 90° and carried creatures
+    AWAY from wide walls. Metabolism × metaMultAt (tundra +25%). Newborn
+    offset falls back to the parent's spot if impassable.
+  - render.js: biome layer baked to an offscreen canvas, cached on
+    terrain.version, blitted after the background fill (before grid);
+    deterministic per-tile speckles (forest dots, tundra flecks, rock inset)
+    so biomes don't read flat.
+  - UI: Terrain button + 5 biome swatches (water preselected). Swatch click
+    = pick biome + arm tool; Terrain button toggles; brush click leaves
+    terrain mode. Drag paints the tile under the cursor; shift-click splats
+    5 tiles in a 96px disc; painting clears inspect.
+  - ui.js display fix: fit values render via Math.round, not toFixed(0) —
+    toFixed prints "-0" for (−0.5, 0) fitness, which is legal early on
+    (gain 0, spent > 0).
+  - Verified in headless Chromium (test5.mjs): all four biome colors on
+    canvas (open still dominant), swatch→drag paints tiles (typeAt 0→1),
+    version bumps, water pixels render after re-bake, no creature sits in
+    water, zero console errors.
+  - M9 plan (next milestone): src/effects.js per-tick zone layer
+    {kind, power, ttl} decaying; single Impact tool + severity slider
+    1..4 (R = 40s+20 → 60/100/140/180px), kill radius 0.5R, energy damage
+    falloff, scorch ttl 150·s, radiation only at s=4 (power 1.0, slow
+    decay); effective mutation ×(1+9·power) (up to 10×) + small energy
+    drain; shockwave ring via app.fx + screen shake.
+  - M10 plan: Tornado = mousedown→drag→release polyline, head travels
+    ~6px/tick, ~20px corridor clears plants/damages; boons Feast (energy
+    plant cluster + feast zone) and Perk (shield or fertility zone).
 - M6 tuning decision: DEFAULT_PLANT_RATE 0.05 → 0.3 (index.html slider now
   0..0.5, default 0.30). Grid probe (plantRate × mutation, 3000–5000 tick
   runs, 5 seeds) showed plant inflow is the dominant boom/crash lever

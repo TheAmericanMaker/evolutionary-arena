@@ -13,6 +13,7 @@ import { randomDna } from './dna.js';
 import { createSpatial } from './spatial.js';
 import { createCreature, updateCreature, OFFSPRING_ENERGY } from './entity.js';
 import { createStats, createRecords } from './stats.js';
+import { createTerrain } from './terrain.js';
 
 export const W = 1024;
 export const H = 640;
@@ -60,15 +61,18 @@ export function createWorld(seed = 1) {
     creatureSeq: 1,
     settings: { plantRate: DEFAULT_PLANT_RATE, mutationRate: DEFAULT_MUTATION_RATE },
   };
+  // M8: terrain first — spawn placement consults it.
+  world.terrain = createTerrain(rng);
   world.plantGrid = createSpatial(W, H);
   world.creatureGrid = createSpatial(W, H);
   world.stats = createStats();
   world.records = createRecords();
   for (let i = 0; i < INITIAL_CREATURES; i++) {
+    const spot = freeSpot(world);
     world.creatures.push(createCreature({
       id: world.creatureSeq++,
-      x: rng.next() * W,
-      y: rng.next() * H,
+      x: spot.x,
+      y: spot.y,
       heading: rng.next() * Math.PI * 2,
       dna: randomDna(rng),
       energy: INITIAL_ENERGY,
@@ -78,6 +82,24 @@ export function createWorld(seed = 1) {
     }));
   }
   return world;
+}
+
+// M8: a random passable spot. Random tries first (deterministic sequence),
+// then a coarse scan, then the world center — so spawn never strands a
+// creature inside water/rock, even on a fully painted-in world.
+function freeSpot(world) {
+  const { rng, terrain } = world;
+  for (let i = 0; i < 32; i++) {
+    const x = rng.next() * W;
+    const y = rng.next() * H;
+    if (terrain.isPassable(x, y)) return { x, y };
+  }
+  for (let y = 16; y < H; y += 32) {
+    for (let x = 16; x < W; x += 32) {
+      if (terrain.isPassable(x, y)) return { x, y };
+    }
+  }
+  return { x: W / 2, y: H / 2 };
 }
 
 export function tick(world) {
@@ -101,10 +123,11 @@ export function tick(world) {
 // position via world.rng (so a fixed input sequence stays deterministic),
 // energy OFFSPRING_ENERGY, generation 1, caller-chosen lineage id.
 export function spawn(world, dna, lineageId) {
+  const spot = freeSpot(world);
   const c = createCreature({
     id: world.creatureSeq++,
-    x: world.rng.next() * W,
-    y: world.rng.next() * H,
+    x: spot.x,
+    y: spot.y,
     heading: world.rng.next() * Math.PI * 2,
     dna,
     energy: OFFSPRING_ENERGY,
@@ -126,14 +149,26 @@ function rebuildCreatureGrid(world) {
 }
 
 function growPlants(world) {
-  const { rng, settings } = world;
+  const { rng, settings, terrain } = world;
   world.plantPool = Math.min(PLANT_POOL_MAX, world.plantPool + PLANT_REGEN);
   if (world.plants.length < MAX_PLANTS && world.plantPool >= PLANT_COST && rng.next() < settings.plantRate) {
-    world.plantPool -= PLANT_COST;
-    world.plants.push({ x: rng.next() * W, y: rng.next() * H, energy: 1 });
+    // M8: sprouts need a plantable tile — retry up to 16 times, else the
+    // regen is deferred (pool keeps filling toward its cap).
+    for (let i = 0; i < 16; i++) {
+      const x = rng.next() * W;
+      const y = rng.next() * H;
+      if (terrain.plantMultAt(x, y) > 0) {
+        world.plantPool -= PLANT_COST;
+        world.plants.push({ x, y, energy: 1 });
+        break;
+      }
+    }
   }
   for (const p of world.plants) {
-    if (p.energy < PLANT_MAX_ENERGY) p.energy += PLANT_GROWTH;
+    // M8: biome climate — forest plants grow twice as fast, tundra half.
+    if (p.energy < PLANT_MAX_ENERGY) {
+      p.energy = Math.min(PLANT_MAX_ENERGY, p.energy + PLANT_GROWTH * terrain.plantMultAt(p.x, p.y));
+    }
   }
 }
 

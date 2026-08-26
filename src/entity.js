@@ -132,8 +132,27 @@ export function updateCreature(c, world) {
     } else {
       c.heading += (rng.next() - 0.5) * WIGGLE;
     }
-    c.x = wrap(c.x + Math.cos(c.heading) * c.dna.speed * DT, W);
-    c.y = wrap(c.y + Math.sin(c.heading) * c.dna.speed * DT, H);
+    // M8: water/rock are impassable. If the step along the current heading
+    // is blocked, align (fully, in one tick) to the first open shore
+    // direction — ±45°, then ±90° — so the creature snaps onto the border
+    // and skims along it; if every candidate is blocked it holds ground
+    // and re-steers next tick.
+    const step = c.dna.speed * DT;
+    const blocked = (a) =>
+      !world.terrain.isPassable(
+        wrap(c.x + Math.cos(a) * step, W),
+        wrap(c.y + Math.sin(a) * step, H),
+      );
+    if (blocked(c.heading)) {
+      for (const dh of [0.785, -0.785, 1.5708, -1.5708]) {
+        const target = turnToward(c.heading, c.heading + dh, Math.PI);
+        if (!blocked(target)) { c.heading = target; break; }
+      }
+    }
+    if (!blocked(c.heading)) {
+      c.x = wrap(c.x + Math.cos(c.heading) * step, W);
+      c.y = wrap(c.y + Math.sin(c.heading) * step, H);
+    }
   }
 
   for (const p of plantGrid.queryCircle(c.x, c.y, c.dna.size + plantRadius(PLANT_MAX_ENERGY))) {
@@ -149,10 +168,15 @@ export function updateCreature(c, world) {
   if (c.energy >= REPRO_THRESHOLD) {
     c.energy -= BIRTH_COST;
     c.offspring += 1;
+    // M8: newborn offset can land in water — fall back to the parent's
+    // (passable) spot rather than stranding the child.
+    let bx = wrap(c.x + (rng.next() - 0.5) * 24, W);
+    let by = wrap(c.y + (rng.next() - 0.5) * 24, H);
+    if (!world.terrain.isPassable(bx, by)) { bx = c.x; by = c.y; }
     return createCreature({
       id: world.creatureSeq++,
-      x: wrap(c.x + (rng.next() - 0.5) * 24, W),
-      y: wrap(c.y + (rng.next() - 0.5) * 24, H),
+      x: bx,
+      y: by,
       heading: rng.next() * Math.PI * 2,
       dna: mutateDna(c.dna, world.settings.mutationRate, rng),
       energy: OFFSPRING_ENERGY,
@@ -162,8 +186,10 @@ export function updateCreature(c, world) {
     });
   }
 
-  c.energy = Math.max(0, c.energy - c.dna.metabolism);
-  c.spent += c.dna.metabolism;
+  // M8: biome climate — tundra costs 25% more metabolism to stay warm.
+  const met = c.dna.metabolism * world.terrain.metaMultAt(c.x, c.y);
+  c.energy = Math.max(0, c.energy - met);
+  c.spent += met;
   if (c.energy <= 0) c.dead = true;
   return null;
 }

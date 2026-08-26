@@ -8,6 +8,7 @@ import { createWorld, tick, W, H } from '../src/world.js';
 import {
   createCreature, MAX_ENERGY, REPRO_THRESHOLD, BIRTH_COST, OFFSPRING_ENERGY,
 } from '../src/entity.js';
+import { TILE, clearTerrain } from '../src/terrain.js';
 
 // Drop the world to exactly one creature and no food sources.
 function isolate(world, creature, plants = []) {
@@ -28,6 +29,7 @@ function makeCreature(overrides = {}) {
 
 test('creature steers to the nearest plant and eats it', () => {
   const world = createWorld(1);
+  clearTerrain(world.terrain); // M8: this test asserts movement, not terrain
   const c = isolate(world, makeCreature({ dna: { speed: 2, vision: 80, metabolism: 0.05, aggression: 0.1, size: 2 } }));
   world.plants = [{ x: 140, y: 100, energy: 20 }]; // 40px ahead, along heading
   for (let i = 0; i < 30 && world.plants.length > 0; i++) tick(world);
@@ -46,6 +48,7 @@ test('a creature with no food starves and is removed from the world', () => {
 
 test('energy is capped at MAX_ENERGY when eating past it', () => {
   const world = createWorld(3);
+  clearTerrain(world.terrain);
   const c = isolate(world, makeCreature({
     energy: 105, // 105 + 20 = 125 -> clamps to 120 -> buds to 80 (85 without clamp)
     dna: { speed: 1, vision: 80, metabolism: 0, aggression: 0, size: 2 },
@@ -84,4 +87,47 @@ test('below-threshold creature does not bud', () => {
 test('MAX_ENERGY and REPRO_THRESHOLD match the spec value 120', () => {
   assert.equal(MAX_ENERGY, 120);
   assert.equal(REPRO_THRESHOLD, 120);
+});
+
+test('M8: a creature heading into water holds at the edge instead of entering', () => {
+  const world = createWorld(55);
+  const t = world.terrain;
+  clearTerrain(t); // fully controlled: open left half, water right half
+  const half = Math.ceil(t.cols / 2);
+  for (let ty = 0; ty < t.rows; ty++) {
+    for (let tx = half; tx < t.cols; tx++) t.paint(tx * TILE + 5, ty * TILE + 5, 1);
+  }
+  // 1px left of the water line, heading straight into it.
+  const c = isolate(world, makeCreature({
+    x: half * TILE - 1, y: 100, heading: 0, energy: 100,
+    dna: { speed: 2, vision: 20, metabolism: 0.05, aggression: 0.1, size: 2 },
+  }));
+  assert.equal(t.isPassable(c.x, c.y), true, 'start position must be passable');
+  for (let i = 0; i < 10; i++) tick(world);
+  assert.ok(t.isPassable(c.x, c.y), `creature entered water at ${c.x}, ${c.y}`);
+  assert.ok(c.x < half * TILE, `creature crossed the water line: ${c.x}`);
+  assert.ok(c.heading > 0.3, `creature should have turned off the water, heading ${c.heading}`);
+});
+
+test('M8: a creature with a water wall ahead skims along it and keeps moving', () => {
+  const world = createWorld(66);
+  const t = world.terrain;
+  clearTerrain(t); // fully controlled: open world plus one water band
+  // Water in a 2-tile-wide vertical band at x 512..576, open on both sides.
+  for (let ty = 0; ty < t.rows; ty++) {
+    for (let tx = 16; tx < 18; tx++) t.paint(tx * TILE + 5, ty * TILE + 5, 1);
+  }
+  const c = isolate(world, makeCreature({
+    x: 496, y: 100, heading: 0, energy: 200,
+    dna: { speed: 2, vision: 20, metabolism: 0.01, aggression: 0.1, size: 2 },
+  }));
+  const x0 = c.x;
+  for (let i = 0; i < 40; i++) {
+    tick(world);
+    assert.ok(t.isPassable(c.x, c.y), `creature in water at ${c.x}, ${c.y} (tick ${i})`);
+  }
+  // It must not pin itself against the wall: 40 ticks of steering along the
+  // band should cover real distance (wander drift may later carry it off).
+  const moved = Math.hypot(c.x - x0, c.y - 100);
+  assert.ok(moved > 20, `creature pinned against the wall, moved only ${moved}px`);
 });

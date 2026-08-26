@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld, tick, W, H, PLANT_POOL_MAX } from '../src/world.js';
 import { createCreature, MAX_ENERGY } from '../src/entity.js';
+import { clearTerrain } from '../src/terrain.js';
 
 function makeCreature(overrides = {}) {
   return createCreature({
@@ -24,6 +25,7 @@ function isolate(world, ...creatures) {
 
 test('carnivore hunts, bites, and kills smaller prey; predator nets energy', () => {
   const world = createWorld(1);
+  clearTerrain(world.terrain); // M8: chase geometry, not terrain
   const pred = makeCreature({
     x: 100, y: 100, heading: 0, energy: 50,
     dna: { speed: 2, vision: 100, metabolism: 0, aggression: 0.9, size: 5 },
@@ -62,6 +64,7 @@ test('predation rule: size + 1 must exceed prey size, else no hunting', () => {
 
 test('flee: creature turns and moves directly away from a visible higher-aggression creature', () => {
   const world = createWorld(3);
+  clearTerrain(world.terrain);
   const prey = makeCreature({
     x: 100, y: 100, heading: 0, energy: 50,
     dna: { speed: 2, vision: 60, metabolism: 0, aggression: 0.1, size: 2 },

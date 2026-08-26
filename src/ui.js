@@ -20,6 +20,10 @@
 //   radius 24).
 // - Kill under cursor arms a one-shot mode; the next canvas click removes
 //   the creature under the cursor immediately (even while paused).
+// - M8 Terrain tool: the Terrain button (or a biome swatch) arms paint mode;
+//   drag on the canvas paints the selected biome tile under the cursor.
+//   Shift-click splats 5 tiles. Painting bumps terrain.version, which makes
+//   render.js re-bake its offscreen layer.
 // - Records (pure, stats.js) persist to localStorage 'arena_records':
 //   merged on load, autosaved every 20s + on pagehide; Reset records clears
 //   storage and the in-memory records. Reset world keeps records (all-time).
@@ -59,13 +63,15 @@ export function createUI(app) {
     killBtn: $('killBtn'), herbBtn: $('herbBtn'), carnBtn: $('carnBtn'),
     resetBtn: $('resetBtn'), recordsBtn: $('recordsBtn'),
     splash: $('splash'), inspect: $('inspect'),
+    terrainBtn: $('terrainBtn'), swatches: document.querySelectorAll('.swatch'),
   };
 
   const chartCtx = els.popChart.getContext('2d');
 
   app.world.records.load(readRecords());
 
-  let tool = 'plant';
+  let tool = 'plant'; // 'plant' | 'feed' | 'terrain'
+  let paintBiome = 1;
   let killArmed = false;
   let userSeq = 0;
   let painting = null;
@@ -91,7 +97,12 @@ export function createUI(app) {
     els.speed.value = String(Math.min(64, Math.max(1, speed() + (e.deltaY < 0 ? 1 : -1))));
   }, { passive: false });
 
+  function setTool(t) {
+    tool = t;
+    els.terrainBtn.classList.toggle('active', t === 'terrain');
+  }
   els.brushBtn.addEventListener('click', () => {
+    if (tool === 'terrain') { setTool('plant'); return; }
     tool = tool === 'plant' ? 'feed' : 'plant';
     els.brushBtn.textContent = tool === 'plant' ? 'Brush: Plant' : 'Brush: Feed';
   });
@@ -99,6 +110,14 @@ export function createUI(app) {
     killArmed = !killArmed;
     els.killBtn.classList.toggle('armed', killArmed);
   });
+  els.terrainBtn.addEventListener('click', () => setTool(tool === 'terrain' ? 'plant' : 'terrain'));
+  for (const sw of els.swatches) {
+    sw.addEventListener('click', () => {
+      paintBiome = Number(sw.dataset.biome);
+      for (const o of els.swatches) o.classList.toggle('active', o === sw);
+      setTool('terrain');
+    });
+  }
   function spawnMany(dna, n) {
     for (let i = 0; i < n; i++) {
       userSeq += 1;
@@ -149,13 +168,22 @@ export function createUI(app) {
     }
   }
 
+  function paintBiomeAt(x, y) {
+    app.world.terrain.paint(wrap(x, W), wrap(y, H), paintBiome);
+  }
+
   function brush(x, y) {
-    if (tool === 'plant') dropPlant(x, y);
+    if (tool === 'terrain') paintBiomeAt(x, y);
+    else if (tool === 'plant') dropPlant(x, y);
     else feedAt(x, y, FEED_RADIUS);
   }
 
   function scatter(x, y) {
-    if (tool === 'plant') {
+    if (tool === 'terrain') {
+      for (let i = 0; i < 5; i++) {
+        paintBiomeAt(x + (app.world.rng.next() - 0.5) * 96, y + (app.world.rng.next() - 0.5) * 96);
+      }
+    } else if (tool === 'plant') {
       for (let i = 0; i < 5; i++) {
         dropPlant(x + (app.world.rng.next() - 0.5) * 48, y + (app.world.rng.next() - 0.5) * 48);
       }
@@ -177,7 +205,7 @@ export function createUI(app) {
     const c = inspected;
     const d = c.dna;
     els.inspect.textContent =
-      `${c.lineageId} g${c.generation} · ${c.state} · E ${c.energy.toFixed(0)} · fit ${fitness(c).toFixed(0)}\n` +
+      `${c.lineageId} g${c.generation} · ${c.state} · E ${c.energy.toFixed(0)} · fit ${Math.round(fitness(c))}\n` +
       `spd ${d.speed.toFixed(2)} · vis ${d.vision.toFixed(0)} · met ${d.metabolism.toFixed(3)}\n` +
       `agg ${d.aggression.toFixed(2)} · size ${d.size.toFixed(1)}`;
     const r = els.canvas.getBoundingClientRect();
@@ -202,7 +230,7 @@ export function createUI(app) {
       }
       return;
     }
-    if (tool === 'feed') {
+    if (tool === 'feed' || tool === 'terrain') {
       clearInspect();
       painting = { x, y };
       brush(x, y);
@@ -248,7 +276,7 @@ export function createUI(app) {
     if (bf) {
       const d = bf.dna;
       els.bestCard.textContent =
-        `BEST ${bf.lineageId} · fit ${bf.value.toFixed(0)}\n` +
+        `BEST ${bf.lineageId} · fit ${Math.round(bf.value)}\n` +
         `spd ${d.speed.toFixed(2)} · vis ${d.vision.toFixed(0)} · met ${d.metabolism.toFixed(3)}\n` +
         `agg ${d.aggression.toFixed(2)} · size ${d.size.toFixed(1)}`;
     }
