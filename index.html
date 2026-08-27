@@ -60,7 +60,12 @@
       <button id="perkBtn" class="btn" title="Arm, then click: drop a fertility zone — creatures bud at 60 energy">Perk</button>
       <button id="herbBtn" class="btn" title="Shift-click spawns 5">+Herbivore</button>
       <button id="carnBtn" class="btn" title="Shift-click spawns 5">+Carnivore</button>
-      <button id="resetBtn" class="btn">Reset world</button>
+      <label class="hud-item" title="This run's seed — same seed replays the same world, same history. Type a seed and press Enter to load it.">seed
+        <input id="seed" type="number" min="0" max="4294967295" step="1" value="1" />
+      </label>
+      <button id="seedCopyBtn" class="btn" title="Copy the seed to the clipboard — share it to replay this exact run">Copy seed</button>
+      <button id="seedNewBtn" class="btn" title="Roll a random seed and restart the world">New seed</button>
+      <button id="resetBtn" class="btn" title="Restart the world with its current seed">Reset world</button>
       <button id="recordsBtn" class="btn">Reset records</button>
     </div>
   </header>
@@ -77,6 +82,7 @@
           <span class="k">Terrain</span><span>pick a swatch, then drag to paint</span>
           <span class="k">Impact</span><span>arm, then click — severity sets the size</span>
           <span class="k">Tornado</span><span>arm, then drag a path — it rips along it</span>
+          <span class="k">Seed</span><span>type/Enter loads a seed · copy it to share the run</span>
           <span class="k">Feast / Perk</span><span>arm, then click — drop a boon zone</span>
           <span class="k">Wheel</span><span>simulation speed</span>
         </div>

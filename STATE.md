@@ -28,7 +28,14 @@ so a fresh session can resume without re-reading everything.
   moving"), so corridor damage is 20 energy/tick (a full ~7-tick pass kills
   a full-energy creature), the drag shows a faint corridor band the width of
   the hazard, and the head leaves a fading wake.
-- All spec milestones complete; M7/M8/M9/M10 were user-directed features
+- M11 CI: DONE — GH Actions "Tests" check (node --test, Node 22) on push to
+  main + every PR (.github/workflows/test.yml).
+- M12 determinism: DONE — tests/determinism.test.js (same seed, two worlds,
+  600 ticks, strict JSON-equality snapshot).
+- M13 seed row: DONE — HUD shows the run's seed; type + Enter loads it, Copy
+  puts it on the clipboard, New rolls a random 32-bit seed; Reset world now
+  restarts the CURRENT seed (was always 1). W1 complete.
+- All spec milestones complete; M7..M13 were user-directed / backlog work
   after browser review.
 - Published: github.com/TheAmericanMaker/evolutionary-arena (public, MIT,
   README + provenance section, LICENSE, .gitignore).
@@ -54,9 +61,9 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
 ## Roadmap backlog
 
 Full public version in ROADMAP.md. Waves:
-- W1: M10 tornado+boons (DONE), M11 CI (DONE — GH Actions "Tests" check),
-  M12 determinism regression (DONE — tests/determinism.test.js, 600 ticks,
-  two worlds, strict JSON-equality snapshot), seed display + copy in HUD.
+- W1: all DONE — M10 tornado+boons, M11 CI (GH Actions "Tests" check),
+  M12 determinism regression (tests/determinism.test.js), M13 seed display
+  + copy + roll in the HUD.
 - W2 (make evolution visible): color-by-lineage toggle (diet|lineage|size),
   lineage detail view (age, population, per-generation trait drift), trait
   drift sparklines in the stats panel, aging (per-tick cost grows with age).
@@ -94,7 +101,7 @@ also asserts the run exercised births+deaths, and that seed 7 vs 8 diverge.
   assert fixed coordinates call clearTerrain(world.terrain) to control the
   layer (seed 3's plant-growth test and the predation chase/flee tests).
 - DOM is not unit tested; instead /tmp/ui-smoke.mjs boots the real
-  engine.js against a minimal DOM stub and exercises every control (21
+  engine.js against a minimal DOM stub and exercises every control (22
   checks: M5's 13 — boot-paused, resume/space/step, spawn, inspect, kill,
   plant/feed brush, scatter, wheel clamp, records persist/reset, world
   reset — M6: sparkline draw calls, best-lineage card content, sparkline
@@ -104,7 +111,11 @@ also asserts the run exercised births+deaths, and that seed 7 vs 8 diverge.
   zones added, shake + 180px blast ring pushed, side panel populates —
   M10: tornado arm → 3-point drag → release gives a 200px live tornado and
   disarms, feast click drops 8 plants + zone + 80px ring, perk click adds
-  the fert zone and disarms, armed tornado + plain click releases nothing).
+  the fert zone and disarms, armed tornado + plain click releases nothing —
+  M13: seed field shows the running seed, typed seeds (7 / max uint32 / 0)
+  load fresh worlds at tick 0, empty entry reverts without resetting,
+  Reset world keeps the current seed, New seed rolls a different one, Copy
+  gives feedback).
   Re-run:
   `node /tmp/ui-smoke.mjs` from the project root (tmp file, may vanish
   after reboot — it is disposable, the real gate is node --test).
@@ -312,9 +323,29 @@ also asserts the run exercised births+deaths, and that seed 7 vs 8 diverge.
        releases a ~120px tornado that expires after path + linger and its
        corridor plant is swept, feast click drops 8 plants with core gain
        1, perk click gives core mult 0.5, zero console errors.
-  - M11 plan (next milestone): W1 remainder — GitHub Actions CI running
-    `node --test`, determinism regression test (same seed, two worlds, N
-    ticks, identical state hash), seed display + copy in HUD.
+   - M13 decisions (W1 final item — shareable, replayable runs):
+     - index.html: HUD row gains a `seed` number input (0..2^32-1, value
+       tracks the running world) + Copy seed + New seed buttons; Reset
+       world's tooltip notes it keeps the current seed; splash legend
+       gains a Seed line. styles.css: dark styling for input[type=number].
+     - ui.js: resetWorld(seed) is now the single reset path — createWorld
+       (seed >>> 0), carries all-time records over, clears fx/shake/
+       tornado draft/inspect, syncs the seed field. Reset world calls
+       resetWorld(app.world.seed) (was hard-coded createWorld(1)); typing
+       a seed + Enter/blur calls resetWorld(typed); an empty entry reverts
+       to the running seed without resetting; New seed rolls
+       crypto.getRandomValues (UI layer — sim randomness stays 100%
+       world.rng); Copy uses navigator.clipboard with an execCommand
+       fallback and flashes "Copied!" / "Copy failed".
+     - Verified: /tmp/ui-smoke.mjs (22 checks), headless Chromium
+       (test8.mjs): row visible, typed seed restarts at tick 0 while
+       paused and runs under it when resumed, New seed rolls a different
+       uint32, Reset keeps the seed, copy feedback + clipboard write,
+       empty entry reverts — zero console errors.
+   - Next (W2, make evolution visible): color-by-lineage toggle (diet |
+     lineage | size), lineage detail view (age, live population, per-
+     generation trait drift), trait-drift sparklines in the stats panel,
+     aging (per-tick cost grows with age).
 - M6 tuning decision: DEFAULT_PLANT_RATE 0.05 → 0.3 (index.html slider now
   0..0.5, default 0.30). Grid probe (plantRate × mutation, 3000–5000 tick
   runs, 5 seeds) showed plant inflow is the dominant boom/crash lever
@@ -361,7 +392,9 @@ also asserts the run exercised births+deaths, and that seed 7 vs 8 diverge.
 
 ## Conventions
 
-- All randomness through world.rng (xorshift32). No Math.random anywhere.
+- All SIM randomness through world.rng (xorshift32). Math.random appears
+  only in render.js screen shake (visual, outside the pure world); the
+  UI's New-seed roll uses crypto.getRandomValues.
 - 2-space indent, const, ES modules, no globals except engine bootstrap.
 - Files under ~250 lines; surgical edits, never rewrite the project.
 - Ambiguities: decide, then write the decision as a comment at the top of

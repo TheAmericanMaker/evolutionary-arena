@@ -7,7 +7,7 @@ reviewed before merging into `main`.
 - [x] M10 Tornado + Boons — drag-drawn tornado hazard; Feast and Perk boon zones
 - [x] M11 CI — GitHub Actions running `node --test` on push and on PR
 - [x] M12 Determinism regression test (same seed, two worlds, identical state after 600 ticks)
-- [ ] Seed display + copy in the HUD (shareable, replayable runs)
+- [x] M13 Seed display + copy (+ roll) in the HUD (shareable, replayable runs)
 
 ## Wave 2 — make evolution visible
 - [ ] Color-by-lineage toggle (diet | lineage | size)
