@@ -38,7 +38,7 @@ start() {
     echo "already running (pid $pid) — http://localhost:$PORT/ — stop it with: $0 stop"
     return 0
   fi
-  nohup python3 -m http.server "$PORT" --bind 127.0.0.1 >"$LOGFILE" 2>&1 </dev/null &
+  nohup python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$DIR" >"$LOGFILE" 2>&1 </dev/null &
   echo $! > "$PIDFILE"
   disown 2>/dev/null || true
   sleep 0.5
