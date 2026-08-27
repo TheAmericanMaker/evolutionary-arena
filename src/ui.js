@@ -28,6 +28,11 @@
 //   drag extends it, release launches a tornado along it (a plain click
 //   releases nothing and disarms). Feast/Perk arm one-shot drops like Impact:
 //   the next canvas click drops the boon zone (effects.js).
+// - M13 Seed row: the run's seed — type + Enter loads it, Copy puts it on
+//   the clipboard (execCommand fallback), New rolls a random 32-bit seed.
+//   Reset world now restarts with the CURRENT seed (was always 1). All
+//   resets keep all-time records. Same seed replays an identical run
+//   (tests/determinism.test.js).
 // - Records (pure, stats.js) persist to localStorage 'arena_records':
 //   merged on load, autosaved every 20s + on pagehide; Reset records clears
 //   storage and the in-memory records. Reset world keeps records (all-time).
@@ -68,6 +73,7 @@ export function createUI(app) {
     pauseBtn: $('pauseBtn'), stepBtn: $('stepBtn'), brushBtn: $('brushBtn'),
     killBtn: $('killBtn'), herbBtn: $('herbBtn'), carnBtn: $('carnBtn'),
     resetBtn: $('resetBtn'), recordsBtn: $('recordsBtn'),
+    seed: $('seed'), seedCopy: $('seedCopyBtn'), seedNew: $('seedNewBtn'),
     splash: $('splash'), inspect: $('inspect'),
     terrainBtn: $('terrainBtn'), swatches: document.querySelectorAll('.swatch'),
     impactBtn: $('impactBtn'), severity: $('severity'), severityVal: $('severityVal'),
@@ -166,12 +172,53 @@ export function createUI(app) {
   }
   els.herbBtn.addEventListener('click', (e) => spawnMany(HERBIVORE_DNA, e.shiftKey ? 5 : 1));
   els.carnBtn.addEventListener('click', (e) => spawnMany(CARNIVORE_DNA, e.shiftKey ? 5 : 1));
-  els.resetBtn.addEventListener('click', () => {
+  els.resetBtn.addEventListener('click', () => resetWorld(app.world.seed));
+  // M13: seed controls — the run's identity. Same seed → identical world and
+  // history (tests/determinism.test.js guards it), so a copied seed is a
+  // shareable, replayable run. New rolls a random 32-bit seed; typing a seed
+  // and committing (Enter/blur) loads it. Both keep all-time records, like
+  // Reset world does.
+  function resetWorld(seed) {
+    const s = Math.floor(Number(seed)) >>> 0;
     const kept = app.world.records.data;
-    app.world = createWorld(1);
+    app.world = createWorld(s);
     app.world.records.load(kept);
+    app.fx.length = 0;
+    app.shake = 0;
+    app.tornadoDraft = null;
+    draftPts = null;
     clearInspect();
+    els.seed.value = String(s);
+  }
+  els.seed.addEventListener('change', () => {
+    const v = els.seed.value.trim();
+    if (!v || Number.isNaN(Number(v))) { els.seed.value = String(app.world.seed); return; }
+    resetWorld(v);
   });
+  els.seedNew.addEventListener('click', () => resetWorld(crypto.getRandomValues(new Uint32Array(1))[0]));
+  function copySeed() {
+    const text = String(app.world.seed);
+    const label = (ok) => {
+      els.seedCopy.textContent = ok ? 'Copied!' : 'Copy failed';
+      setTimeout(() => { els.seedCopy.textContent = 'Copy seed'; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => label(true), () => fallbackCopy(text, label));
+    } else fallbackCopy(text, label);
+  }
+  function fallbackCopy(text, label) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      label(document.execCommand('copy'));
+      ta.remove();
+    } catch { label(false); }
+  }
+  els.seedCopy.addEventListener('click', copySeed);
   els.recordsBtn.addEventListener('click', () => {
     app.world.records.reset();
     try { localStorage.removeItem(RECORDS_KEY); } catch { /* ignore */ }
