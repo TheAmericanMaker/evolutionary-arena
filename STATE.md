@@ -34,7 +34,10 @@ so a fresh session can resume without re-reading everything.
   README + provenance section, LICENSE, .gitignore).
 - Workflow change (user-directed): all work happens on the `qwen-dev`
   branch; changes reach `main` only via PRs that the human reviews before
-  merging. Never commit features directly to main.
+  merging. Never commit features directly to main. PRs created by the agent
+  must identify their author in the body, e.g. a closing line: "Created by
+  the Qwen3.8-27B (local) agent running in opencode, on behalf of
+  TheAmericanMaker."
 - Local server (dev tooling, PR #3): manage the port-8000 dev server with
   `scripts/serve.sh [start|stop|status]` — never hand-roll a backgrounded
   `python3 -m http.server` (one left in a dead shell session can hang with a
@@ -52,8 +55,8 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
 
 Full public version in ROADMAP.md. Waves:
 - W1: M10 tornado+boons (DONE), M11 CI (DONE — GH Actions "Tests" check),
-  determinism regression test (same seed, two worlds, identical state),
-  seed display + copy in HUD.
+  M12 determinism regression (DONE — tests/determinism.test.js, 600 ticks,
+  two worlds, strict JSON-equality snapshot), seed display + copy in HUD.
 - W2 (make evolution visible): color-by-lineage toggle (diet|lineage|size),
   lineage detail view (age, population, per-generation trait drift), trait
   drift sparklines in the stats panel, aging (per-tick cost grows with age).
@@ -66,9 +69,13 @@ Full public version in ROADMAP.md. Waves:
 
 ## Tests
 
-`node --test "tests/*.test.js"` → 72 pass / 0 fail (verified this session).
+`node --test "tests/*.test.js"` → 74 pass / 0 fail (verified this session).
 Also runs in CI (M11): .github/workflows/test.yml — "Tests" check on push to
 main and on every PR (Node 22, ubuntu-latest, no dependencies to install).
+M12: tests/determinism.test.js is the reproducibility guard — same seed, two
+worlds, 600 ticks, strict JSON-equality of the full state snapshot (creatures
+incl. dna, plants, plant pool, effect zones, records, birth/death counters);
+also asserts the run exercised births+deaths, and that seed 7 vs 8 diverge.
 - rng.test.js (5), world.test.js (14: +spawn, +M8 terrain), dna.test.js
   (7: +standard genomes), entity.test.js (8: +M8 water steering),
   predation.test.js (7), stats.test.js (6: +fitness, records
