@@ -51,7 +51,7 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
 ## Roadmap backlog
 
 Full public version in ROADMAP.md. Waves:
-- W1: M10 tornado+boons (DONE), CI (GH Actions running node --test),
+- W1: M10 tornado+boons (DONE), M11 CI (DONE — GH Actions "Tests" check),
   determinism regression test (same seed, two worlds, identical state),
   seed display + copy in HUD.
 - W2 (make evolution visible): color-by-lineage toggle (diet|lineage|size),
@@ -67,6 +67,8 @@ Full public version in ROADMAP.md. Waves:
 ## Tests
 
 `node --test "tests/*.test.js"` → 72 pass / 0 fail (verified this session).
+Also runs in CI (M11): .github/workflows/test.yml — "Tests" check on push to
+main and on every PR (Node 22, ubuntu-latest, no dependencies to install).
 - rng.test.js (5), world.test.js (14: +spawn, +M8 terrain), dna.test.js
   (7: +standard genomes), entity.test.js (8: +M8 water steering),
   predation.test.js (7), stats.test.js (6: +fitness, records
