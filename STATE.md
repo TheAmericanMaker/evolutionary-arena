@@ -20,9 +20,26 @@ so a fresh session can resume without re-reading everything.
   rad cloud; scorch drains/blocks plants; rad amplifies mutation up to 10x;
   screen shake + blast ring; side stats panel with population/ecosystem/
   evolution breakdowns)
-- All spec milestones complete; M7/M8/M9 were user-directed features after
-  browser review. M10 (tornado + boons) is planned but not started — see
-  Decisions.
+- M10 tornado + boons: DONE (Tornado = arm → drag a path → release; the head
+  rips along it clearing plants and damaging creatures; Feast drops a mature
+  plant cluster + energy-gain zone; Perk drops a fertility zone that halves
+  the bud threshold to 60 in its core). Post-review fix: the tornado was
+  too subtle to read and too weak to feel (user saw creatures "just keep
+  moving"), so corridor damage is 20 energy/tick (a full ~7-tick pass kills
+  a full-energy creature), the drag shows a faint corridor band the width of
+  the hazard, and the head leaves a fading wake.
+- All spec milestones complete; M7/M8/M9/M10 were user-directed features
+  after browser review.
+- Published: github.com/TheAmericanMaker/evolutionary-arena (public, MIT,
+  README + provenance section, LICENSE, .gitignore).
+- Workflow change (user-directed): all work happens on the `qwen-dev`
+  branch; changes reach `main` only via PRs that the human reviews before
+  merging. Never commit features directly to main.
+- Local server (dev tooling, PR #3): manage the port-8000 dev server with
+  `scripts/serve.sh [start|stop|status]` — never hand-roll a backgrounded
+  `python3 -m http.server` (one left in a dead shell session can hang with a
+  full accept queue and block the port). stop finds the listener by port even
+  without a pidfile.
 
 Milestone rule: one milestone per turn, then STOP for human browser review.
 Do not auto-advance. End every turn with a 1–2 sentence done summary plus
@@ -31,9 +48,25 @@ green, then commit the milestone: one commit per milestone, message format
 `M<n>: <kebab-case summary>` (e.g. `M6: polish sparkline best-lineage-card
 plant-rate-tuning`). Only that milestone's changes in the commit.
 
+## Roadmap backlog
+
+Full public version in ROADMAP.md. Waves:
+- W1: M10 tornado+boons (DONE), CI (GH Actions running node --test),
+  determinism regression test (same seed, two worlds, identical state),
+  seed display + copy in HUD.
+- W2 (make evolution visible): color-by-lineage toggle (diet|lineage|size),
+  lineage detail view (age, population, per-generation trait drift), trait
+  drift sparklines in the stats panel, aging (per-tick cost grows with age).
+- W3 (deepen sim): metabolic trade-offs (speed/size burn energy — currently
+  drift pushes all traits to their max), seasonal plant cycles (regen pool
+  pulses), scenario presets (Drought, Ice Age, Mutagen Storm, Purge).
+- W4 (shareability): screenshot capture (canvas+stats PNG), README
+  screenshot/GIF, interactive population chart (hover, diet series),
+  responsive scale. Out of scope: audio, touch, multiplayer.
+
 ## Tests
 
-`node --test "tests/*.test.js"` → 63 pass / 0 fail (verified this session).
+`node --test "tests/*.test.js"` → 72 pass / 0 fail (verified this session).
 - rng.test.js (5), world.test.js (14: +spawn, +M8 terrain), dna.test.js
   (7: +standard genomes), entity.test.js (8: +M8 water steering),
   predation.test.js (7), stats.test.js (6: +fitness, records
@@ -41,19 +74,28 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
   dominance, toroidal lookups, biome data, paint/version, grid coverage),
   effects.test.js (9: M9 — blast radii, kill/damage falloff, scorch drain +
   growth-freeze + ttl expiry, s3/s4 terrain scars, rad falloff + decay,
-  rad-amplified offspring mutation vs control, death-cause/birth tally)
+  rad-amplified offspring mutation vs control, death-cause/birth tally),
+  tornado.test.js (9: M10 — click releases no tornado, head speed + clamp,
+   corridor clears plants / damages creatures incl. a full-energy (120)
+   victim dying to a clean pass (deathCause 'hazard'), expire
+  after path + linger, feast cluster + gain zone, feast grants energy via
+  world.tick vs control world, fert mult falloff, bud at 70 inside the core
+  but not outside, boon ttls (feast 300 outlives perk 240))
 - M8 note: createWorld now generates terrain, so movement/plant tests that
   assert fixed coordinates call clearTerrain(world.terrain) to control the
   layer (seed 3's plant-growth test and the predation chase/flee tests).
 - DOM is not unit tested; instead /tmp/ui-smoke.mjs boots the real
-  engine.js against a minimal DOM stub and exercises every control (18
+  engine.js against a minimal DOM stub and exercises every control (21
   checks: M5's 13 — boot-paused, resume/space/step, spawn, inspect, kill,
   plant/feed brush, scatter, wheel clamp, records persist/reset, world
   reset — M6: sparkline draw calls, best-lineage card content, sparkline
   survives a post-reset empty window — M8: swatch arms terrain tool, drag
   paints tiles, version bumps for the bake, brush click leaves the mode —
   M9: impact arms, s4 drop scars rock core + scorched rim, rad/scorch
-  zones added, shake + 180px blast ring pushed, side panel populates).
+  zones added, shake + 180px blast ring pushed, side panel populates —
+  M10: tornado arm → 3-point drag → release gives a 200px live tornado and
+  disarms, feast click drops 8 plants + zone + 80px ring, perk click adds
+  the fert zone and disarms, armed tornado + plain click releases nothing).
   Re-run:
   `node /tmp/ui-smoke.mjs` from the project root (tmp file, may vanish
   after reboot — it is disposable, the real gate is node --test).
@@ -208,11 +250,62 @@ plant-rate-tuning`). Only that milestone's changes in the commit.
     crater pixels distinct from water/open (the fresh glow tints them, so
     pixel asserts are "distinctly not water/background", exact colors are
     the tile ids), no creature sits in the new rock, zero console errors.
-  - M10 plan (next milestone): Tornado = mousedown→drag→release polyline,
-    head travels ~6px/tick, ~20px corridor clears plants/damages; boons
-    Feast (energy plant cluster + feast zone) and Perk (shield or fertility
-    zone) — both ride the same effects.js zone layer (add kinds
-    'feast'/'shield'/'fert').
+   - M10 decisions (user-directed: tornado hazard + two boons):
+     - effects.js: Tornado is world-owned state, not a zone. startTornado(world,
+       pts) dedupes sub-px points, requires a path >= MIN_TORNADO=24 px (a
+       plain click releases nothing), and stores { pts, cum, total, dist,
+       linger, x, y } on world.tornado. tickTornado(world) — called from
+       world.tick after the creature loop, before the death tally — advances
+       the head TORNADO_SPEED=6 px/tick along the polyline (tornadoPoint
+       interpolates by arc length), clears plants and deals TORNADO_DMG=20
+       energy/tick to creatures within TORNADO_RADIUS=20 (toroidal; deaths
+       = 'hazard') — a full corridor pass is ~7 ticks ≈ 140 damage, so a
+       full-energy (120) creature dies to a clean sweep while a 1-3 tick
+       graze only wounds (post-review tuning; was 8, which let full-energy
+       creatures shrug off the pass) — then lingers TORNADO_LINGER=40 ticks
+       at the path end and clears. The path is screen space (a seam-crossing drag is one long
+       chord); only the corridor geometry wraps.
+     - effects.js boons on the M9 zone layer: feast(world,x,y) drops
+       FEAST_PLANTS=8 mature plants (energy PLANT_MAX_ENERGY) in a
+       FEAST_CLUSTER=40 px disc (user action — bypasses plant pool and
+       MAX_PLANTS like brush plants) plus a 'feast' zone (r=FEAST_R=80,
+       ttl=300) granting FEAST_GAIN=1 × power × (1-d/r) energy/tick via
+       effects.gainAt (world.tick applies it, capped at MAX_ENERGY).
+       perk(world,x,y) adds a 'fert' zone (r=FERT_R=90, ttl=240):
+       effects.fertMultAt = 1 - FERT_STRENGTH=0.5 × power × (1-d/r), deepest
+       zone wins, 1 outside.
+     - entity.js: bud check is now
+       `c.energy >= REPRO_THRESHOLD * world.effects.fertMultAt(c.x, c.y)` —
+       a fresh fert core halves the threshold (120 → 60).
+     - world.js: world.tornado = null in createWorld; tick() applies
+       gainAt per creature (after the M9 drain) and calls tickTornado()
+       before effects.tick() so tornado deaths tally in the same tick.
+      - ui.js: Tornado = arm → mousedown starts the draft path, mousemove
+        appends points >=12 px apart (render.js draws the corridor band +
+        dashed centerline + start ring + end dot while dragging), mouseup
+        calls startTornado, pushes a 2×radius fx ring at
+       the path start, sets shake 4, and always disarms (one-shot).
+       Feast/Perk are one-shot arm modes like Impact: next canvas click
+       drops the boon (fx rings 80 / 90 px) and disarms.
+      - render.js: render(ctx, world, fx, shake, draft) — drawTornado paints
+        three rotating arcs + the corridor ring at the head, plus a fading
+        wake (three trailing arcs sampled 12/24/36 px back along the path,
+        clamped at the start) so a 6 px/tick sweep is visible; drawZones
+        gains feast (amber) and fert (pink) fades; drawTornadoDraft draws
+        a faint band 2×TORNADO_RADIUS wide (round caps) under the dashed
+        centerline so the sweep's reach reads before release.
+     - engine.js: app.tornadoDraft (ui's draft path, passed to render);
+       while world.tornado is live the frame loop holds a shake floor of 2.
+     - index.html: Tornado/Feast/Perk buttons after the severity label;
+       splash legend gains both lines. No new CSS (.btn.armed reused).
+     - Verified: node --test (9 tornado tests), /tmp/ui-smoke.mjs (21
+       checks), headless Chromium (test7.mjs): buttons visible, drag
+       releases a ~120px tornado that expires after path + linger and its
+       corridor plant is swept, feast click drops 8 plants with core gain
+       1, perk click gives core mult 0.5, zero console errors.
+  - M11 plan (next milestone): W1 remainder — GitHub Actions CI running
+    `node --test`, determinism regression test (same seed, two worlds, N
+    ticks, identical state hash), seed display + copy in HUD.
 - M6 tuning decision: DEFAULT_PLANT_RATE 0.05 → 0.3 (index.html slider now
   0..0.5, default 0.30). Grid probe (plantRate × mutation, 3000–5000 tick
   runs, 5 seeds) showed plant inflow is the dominant boom/crash lever

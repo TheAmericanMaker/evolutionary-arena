@@ -24,6 +24,10 @@
 //   drag on the canvas paints the selected biome tile under the cursor.
 //   Shift-click splats 5 tiles. Painting bumps terrain.version, which makes
 //   render.js re-bake its offscreen layer.
+// - M10 Tornado/Feast/Perk: Tornado arms a drag — mousedown starts the path,
+//   drag extends it, release launches a tornado along it (a plain click
+//   releases nothing and disarms). Feast/Perk arm one-shot drops like Impact:
+//   the next canvas click drops the boon zone (effects.js).
 // - Records (pure, stats.js) persist to localStorage 'arena_records':
 //   merged on load, autosaved every 20s + on pagehide; Reset records clears
 //   storage and the in-memory records. Reset world keeps records (all-time).
@@ -32,7 +36,7 @@ import { HERBIVORE_DNA, CARNIVORE_DNA } from './dna.js';
 import { drawSparkline } from './render.js';
 import { fitness } from './stats.js';
 import { createWorld, tick, spawn, W, H, wrap } from './world.js';
-import { impact, impactRadius } from './effects.js';
+import { impact, impactRadius, feast, perk, startTornado, FEAST_R, FERT_R, TORNADO_RADIUS } from './effects.js';
 import { panelIds, updatePanel } from './panel.js';
 import { toroidDist } from './spatial.js';
 import { OFFSPRING_ENERGY, MAX_ENERGY } from './entity.js';
@@ -67,6 +71,7 @@ export function createUI(app) {
     splash: $('splash'), inspect: $('inspect'),
     terrainBtn: $('terrainBtn'), swatches: document.querySelectorAll('.swatch'),
     impactBtn: $('impactBtn'), severity: $('severity'), severityVal: $('severityVal'),
+    tornadoBtn: $('tornadoBtn'), feastBtn: $('feastBtn'), perkBtn: $('perkBtn'),
   };
   const panel = panelIds();
 
@@ -78,6 +83,10 @@ export function createUI(app) {
   let paintBiome = 1;
   let killArmed = false;
   let impactArmed = false;
+  let tornadoArmed = false;
+  let feastArmed = false;
+  let perkArmed = false;
+  let draftPts = null;
   let userSeq = 0;
   let painting = null;
 
@@ -123,6 +132,22 @@ export function createUI(app) {
   });
   els.severity.addEventListener('input', () => {
     els.severityVal.textContent = els.severity.value;
+  });
+  // M10: Tornado arms a drag — mousedown starts the path, drag extends it,
+  // release launches the tornado along it (a plain click releases nothing).
+  // Feast/Perk arm one-shot modes like Impact: the next click drops the boon.
+  els.tornadoBtn.addEventListener('click', () => {
+    tornadoArmed = !tornadoArmed;
+    els.tornadoBtn.classList.toggle('armed', tornadoArmed);
+    if (!tornadoArmed) { draftPts = null; app.tornadoDraft = null; }
+  });
+  els.feastBtn.addEventListener('click', () => {
+    feastArmed = !feastArmed;
+    els.feastBtn.classList.toggle('armed', feastArmed);
+  });
+  els.perkBtn.addEventListener('click', () => {
+    perkArmed = !perkArmed;
+    els.perkBtn.classList.toggle('armed', perkArmed);
   });
   els.terrainBtn.addEventListener('click', () => setTool(tool === 'terrain' ? 'plant' : 'terrain'));
   for (const sw of els.swatches) {
@@ -242,6 +267,28 @@ export function createUI(app) {
       clearInspect();
       return;
     }
+    if (feastArmed) {
+      feastArmed = false;
+      els.feastBtn.classList.remove('armed');
+      feast(app.world, x, y);
+      app.fx.push({ x, y, t: app.world.tick, hue: 45, ring: FEAST_R });
+      clearInspect();
+      return;
+    }
+    if (perkArmed) {
+      perkArmed = false;
+      els.perkBtn.classList.remove('armed');
+      perk(app.world, x, y);
+      app.fx.push({ x, y, t: app.world.tick, hue: 320, ring: FERT_R });
+      clearInspect();
+      return;
+    }
+    if (tornadoArmed) {
+      draftPts = [{ x, y }];
+      app.tornadoDraft = draftPts;
+      clearInspect();
+      return;
+    }
     if (e.shiftKey) { clearInspect(); scatter(x, y); return; }
     if (killArmed) {
       killArmed = false;
@@ -269,6 +316,12 @@ export function createUI(app) {
   });
 
   window.addEventListener('mousemove', (e) => {
+    if (draftPts) {
+      const { x, y } = worldPos(e);
+      const last = draftPts[draftPts.length - 1];
+      if ((x - last.x) ** 2 + (y - last.y) ** 2 >= 144) draftPts.push({ x, y }); // 12px
+      return;
+    }
     if (!painting) return;
     const { x, y } = worldPos(e);
     const dx = x - painting.x;
@@ -278,7 +331,20 @@ export function createUI(app) {
     brush(x, y);
   });
 
-  window.addEventListener('mouseup', () => { painting = null; });
+  window.addEventListener('mouseup', () => {
+    if (draftPts) {
+      const t = startTornado(app.world, draftPts);
+      draftPts = null;
+      app.tornadoDraft = null;
+      if (t) {
+        app.shake = Math.max(app.shake, 4);
+        app.fx.push({ x: t.pts[0].x, y: t.pts[0].y, t: app.world.tick, hue: 210, ring: TORNADO_RADIUS * 2 });
+      }
+      tornadoArmed = false;
+      els.tornadoBtn.classList.remove('armed');
+    }
+    painting = null;
+  });
 
   function hud() {
     const w = app.world;

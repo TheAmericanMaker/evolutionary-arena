@@ -165,7 +165,9 @@ export function updateCreature(c, world) {
     }
   }
 
-  if (c.energy >= REPRO_THRESHOLD) {
+  // M10: fertility boons lower the bud threshold locally — a 'fert' zone's
+  // fresh core halves it (120 -> 60 energy), falling off to 1 at the rim.
+  if (c.energy >= REPRO_THRESHOLD * world.effects.fertMultAt(c.x, c.y)) {
     c.energy -= BIRTH_COST;
     c.offspring += 1;
     // M8: newborn offset can land in water — fall back to the parent's
