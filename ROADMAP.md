@@ -6,7 +6,7 @@ reviewed before merging into `main`.
 ## Wave 1 — finish what's planned, harden the core claims
 - [x] M10 Tornado + Boons — drag-drawn tornado hazard; Feast and Perk boon zones
 - [x] M11 CI — GitHub Actions running `node --test` on push and on PR
-- [ ] Determinism regression test (same seed, two worlds, identical state after N ticks)
+- [x] M12 Determinism regression test (same seed, two worlds, identical state after 600 ticks)
 - [ ] Seed display + copy in the HUD (shareable, replayable runs)
 
 ## Wave 2 — make evolution visible
